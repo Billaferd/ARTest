@@ -48,7 +48,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const msg = "Could not get initial location. Using default view.";
                 console.log(msg);
                 logErrorToOverlay(msg);
-            }
+            },
+            { enableHighAccuracy: true }
         );
     }
 
@@ -111,7 +112,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const msg = "Could not get location. Please enable location services.";
                     instructions.innerHTML = `<p>${msg}</p>`;
                     logErrorToOverlay(msg);
-                }
+                },
+                { enableHighAccuracy: true }
             );
         } else {
             const msg = "Geolocation not available on this device.";
