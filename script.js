@@ -111,8 +111,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (window.DeviceOrientationEvent) {
             window.addEventListener('deviceorientation', (event) => {
-                // alpha: rotation around z-axis
-                deviceOrientation = event.alpha;
+                let heading = event.alpha;
+                if (typeof event.webkitCompassHeading !== 'undefined') {
+                    heading = event.webkitCompassHeading; // More reliable on iOS
+                }
+                deviceOrientation = heading;
                 updateARView();
             });
         } else {
@@ -170,7 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const screenWidth = window.innerWidth;
 
         if (Math.abs(angleDifference) < fov / 2) {
-            const xPosition = (angleDifference / (fov / 2)) * (screenWidth / 2) + (screenWidth / 2);
+            const xPosition = (-angleDifference / (fov / 2)) * (screenWidth / 2) + (screenWidth / 2);
             arMarker.style.left = `${xPosition}px`;
             arMarker.style.display = 'block';
         } else {
