@@ -151,11 +151,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let content = '--- Diagnostics ---<br>';
         for (const [key, value] of Object.entries(data)) {
             let displayValue = value;
-            if (typeof value === 'number') {
-                displayValue = value.toFixed(3);
-            }
             if (typeof value === 'object' && value !== null) {
-                displayValue = JSON.stringify(value, (k, v) => (typeof v === 'number' ? v.toFixed(3) : v), 2);
+                displayValue = JSON.stringify(value, null, 2);
             }
             content += `${key}: ${displayValue}<br>`;
         }
@@ -176,6 +173,14 @@ document.addEventListener('DOMContentLoaded', () => {
             angleDifference -= 360;
         } else if (angleDifference < -180) {
             angleDifference += 360;
+        }
+
+        // Add green outline when target is in view
+        const inViewThreshold = 2.0; // degrees
+        if (Math.abs(angleDifference) < inViewThreshold) {
+            cameraContainer.classList.add('target-in-view');
+        } else {
+            cameraContainer.classList.remove('target-in-view');
         }
 
         // Dynamic sizing
