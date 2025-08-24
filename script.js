@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const arMarker = document.getElementById('ar-marker');
     const instructions = document.getElementById('instructions');
     const diagnosticsOverlay = document.getElementById('diagnostics');
+    const compassStatus = document.getElementById('compass-status');
 
     let map;
     let userLocation;
@@ -127,6 +128,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const handleOrientation = (event) => {
             rawHeading = event.alpha;
             isAbsolute = event.absolute;
+
+            if (compassStatus.innerHTML === '') { // Only set once
+                if (isAbsolute) {
+                    compassStatus.textContent = 'Compass: Absolute';
+                    compassStatus.style.color = 'limegreen';
+                } else {
+                    compassStatus.textContent = 'Compass: Relative';
+                    compassStatus.style.color = 'orange';
+                }
+            }
 
             let heading = event.alpha;
             if (typeof event.webkitCompassHeading !== 'undefined') {
