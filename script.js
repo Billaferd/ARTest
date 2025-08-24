@@ -17,6 +17,24 @@ document.addEventListener('DOMContentLoaded', () => {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
+    // Center map on user's location
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(
+            (position) => {
+                const initialLocation = {
+                    lat: position.coords.latitude,
+                    lng: position.coords.longitude
+                };
+                map.setView(initialLocation, 16);
+                map.isUserLocationSet = true; // Flag to prevent re-centering in watchPosition
+                L.marker(initialLocation).addTo(map).bindPopup("You are here").openPopup();
+            },
+            () => {
+                console.log("Could not get initial location. Using default view.");
+            }
+        );
+    }
+
     map.on('click', (e) => {
         targetLocation = e.latlng;
         instructions.innerHTML = `<p>Target selected at: ${targetLocation.lat.toFixed(4)}, ${targetLocation.lng.toFixed(4)}</p><p>Look around to find it!</p>`;
@@ -92,6 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const distance = calculateDistance(userLocation, targetLocation);
         const bearing = calculateBearing(userLocation, targetLocation);
         let angleDifference = bearing - deviceOrientation;
 
@@ -101,6 +120,18 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (angleDifference < -180) {
             angleDifference += 360;
         }
+
+        // Dynamic sizing
+        const maxMarkerSize = window.innerWidth / 4;
+        const minMarkerSize = 30; // in pixels
+        const maxDistanceForScaling = 100; // in km
+
+        const distanceRatio = Math.min(distance / maxDistanceForScaling, 1.0);
+        const markerSize = minMarkerSize + distanceRatio * (maxMarkerSize - minMarkerSize);
+
+        arMarker.style.borderBottomWidth = `${markerSize}px`;
+        arMarker.style.borderLeftWidth = `${markerSize / 2}px`;
+        arMarker.style.borderRightWidth = `${markerSize / 2}px`;
 
         // Assuming a horizontal field of view of 60 degrees
         const fov = 60;
@@ -113,6 +144,20 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             arMarker.style.display = 'none';
         }
+    }
+
+    function calculateDistance(start, end) {
+        const R = 6371; // Radius of the Earth in km
+        const toRadians = Math.PI / 180;
+        const dLat = (end.lat - start.lat) * toRadians;
+        const dLon = (end.lng - start.lng) * toRadians;
+        const lat1 = start.lat * toRadians;
+        const lat2 = end.lat * toRadians;
+
+        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                  Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c; // Distance in km
     }
 
     function calculateBearing(start, end) {

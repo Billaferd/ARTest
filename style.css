@@ -33,12 +33,14 @@ body {
     position: absolute;
     top: 50%;
     left: 50%;
-    width: 20px;
-    height: 20px;
-    border: 2px solid white;
-    border-radius: 50%;
+    width: 0;
+    height: 0;
+    border-left: 15px solid transparent;
+    border-right: 15px solid transparent;
+    border-bottom: 30px solid white;
     transform: translate(-50%, -50%);
     display: none; /* Initially hidden */
+    /* The size will be set dynamically via JavaScript */
 }
 
 #instructions {
