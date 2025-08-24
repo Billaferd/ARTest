@@ -10,9 +10,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let userLocation;
     let targetLocation;
     let deviceOrientation;
-    let smoothedOrientation;
     let rawHeading, isAbsolute;
     let magneticDeclination = 0; // Default to 0
+
+    // Kalman filters for smoothing the x and y components of the heading vector
+    const kfX = new KalmanFilter({R: 0.1, Q: 2});
+    const kfY = new KalmanFilter({R: 0.1, Q: 2});
 
     function logErrorToOverlay(message) {
         diagnosticsOverlay.innerHTML += `<br><span style="color: red;">ERROR: ${message}</span>`;
@@ -130,24 +133,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 heading = event.webkitCompassHeading; // More reliable on iOS
             }
 
-            if (smoothedOrientation === undefined) {
-                smoothedOrientation = heading;
-            } else {
-                const smoothingFactor = 0.4; // Increased for more responsiveness
-                let diff = heading - smoothedOrientation;
+            // Convert heading to a 2D vector
+            const headingRad = heading * Math.PI / 180;
+            const x = Math.cos(headingRad);
+            const y = Math.sin(headingRad);
 
-                // Handle wrap-around
-                if (diff > 180) { diff -= 360; }
-                if (diff < -180) { diff += 360; }
+            // Filter the vector components
+            const filteredX = kfX.filter(x);
+            const filteredY = kfY.filter(y);
 
-                smoothedOrientation += diff * smoothingFactor;
-
-                // Keep it in the 0-360 range
-                smoothedOrientation = (smoothedOrientation + 360) % 360;
-            }
+            // Convert the smoothed vector back to an angle
+            const smoothedHeadingRad = Math.atan2(filteredY, filteredX);
+            let smoothedHeading = smoothedHeadingRad * 180 / Math.PI;
+            smoothedHeading = (smoothedHeading + 360) % 360;
 
             // Apply magnetic declination to get True North heading
-            const trueHeading = smoothedOrientation + magneticDeclination;
+            const trueHeading = smoothedHeading + magneticDeclination;
             deviceOrientation = (trueHeading + 360) % 360;
 
             updateARView();
@@ -225,13 +226,17 @@ document.addEventListener('DOMContentLoaded', () => {
             arMarker.style.display = 'none';
         }
 
+        // Let's rename smoothedOrientation to magneticHeading for clarity
+        const magneticHeading = smoothedHeading;
+        const trueHeading = deviceOrientation;
+
         updateDiagnostics({
             userLocation,
             targetLocation,
             rawHeading,
-            smoothedOrientation,
+            magneticHeading,
             magneticDeclination,
-            trueHeading: deviceOrientation,
+            trueHeading,
             isAbsolute,
             distance,
             bearing,
