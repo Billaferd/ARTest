@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let deviceOrientation;
     let smoothedOrientation;
     let rawHeading, isAbsolute;
+    let magneticDeclination = 0; // Default to 0
 
     function logErrorToOverlay(message) {
         diagnosticsOverlay.innerHTML += `<br><span style="color: red;">ERROR: ${message}</span>`;
@@ -35,6 +36,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 map.setView(initialLocation, 16);
                 map.isUserLocationSet = true; // Flag to prevent re-centering in watchPosition
                 L.marker(initialLocation).addTo(map).bindPopup("You are here").openPopup();
+
+                // Calculate magnetic declination
+                if (typeof geomagnetism !== 'undefined') {
+                    const model = geomagnetism.model(new Date());
+                    const point = model.point([initialLocation.lat, initialLocation.lng]);
+                    magneticDeclination = point.decl;
+                }
             },
             () => {
                 const msg = "Could not get initial location. Using default view.";
@@ -136,7 +144,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 smoothedOrientation = (smoothedOrientation + 360) % 360;
             }
 
-            deviceOrientation = smoothedOrientation;
+            // Apply magnetic declination to get True North heading
+            const trueHeading = smoothedOrientation + magneticDeclination;
+            deviceOrientation = (trueHeading + 360) % 360;
+
             updateARView();
         };
 
@@ -161,7 +172,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             content += `${key}: ${displayValue}<br>`;
         }
-        content += '<br><i>Note: Compass is relative to Magnetic North.</i>';
         diagnosticsOverlay.innerHTML = content;
     }
 
@@ -217,7 +227,9 @@ document.addEventListener('DOMContentLoaded', () => {
             userLocation,
             targetLocation,
             rawHeading,
-            smoothedOrientation: deviceOrientation,
+            smoothedOrientation,
+            magneticDeclination,
+            trueHeading: deviceOrientation,
             isAbsolute,
             distance,
             bearing,
