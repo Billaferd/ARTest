@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let userLocation;
     let targetLocation;
     let deviceOrientation;
+    let smoothedOrientation;
 
     function logErrorToOverlay(message) {
         diagnosticsOverlay.innerHTML += `<br><span style="color: red;">ERROR: ${message}</span>`;
@@ -115,7 +116,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (typeof event.webkitCompassHeading !== 'undefined') {
                     heading = event.webkitCompassHeading; // More reliable on iOS
                 }
-                deviceOrientation = heading;
+
+                if (smoothedOrientation === undefined) {
+                    smoothedOrientation = heading;
+                } else {
+                    const smoothingFactor = 0.1;
+                    let diff = heading - smoothedOrientation;
+
+                    // Handle wrap-around
+                    if (diff > 180) { diff -= 360; }
+                    if (diff < -180) { diff += 360; }
+
+                    smoothedOrientation += diff * smoothingFactor;
+
+                    // Keep it in the 0-360 range
+                    smoothedOrientation = (smoothedOrientation + 360) % 360;
+                }
+
+                deviceOrientation = smoothedOrientation;
                 updateARView();
             });
         } else {
@@ -173,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const screenWidth = window.innerWidth;
 
         if (Math.abs(angleDifference) < fov / 2) {
-            const xPosition = (-angleDifference / (fov / 2)) * (screenWidth / 2) + (screenWidth / 2);
+            const xPosition = (angleDifference / (fov / 2)) * (screenWidth / 2) + (screenWidth / 2);
             arMarker.style.left = `${xPosition}px`;
             arMarker.style.display = 'block';
         } else {
