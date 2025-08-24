@@ -67,3 +67,8 @@ body {
     max-width: calc(100% - 40px);
     word-wrap: break-word;
 }
+
+#camera-container.target-in-view {
+    outline: 5px solid limegreen;
+    box-sizing: border-box;
+}
