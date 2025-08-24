@@ -111,35 +111,40 @@ document.addEventListener('DOMContentLoaded', () => {
             logErrorToOverlay(msg);
         }
 
-        if (window.DeviceOrientationEvent) {
-            window.addEventListener('deviceorientation', (event) => {
-                rawHeading = event.alpha;
-                isAbsolute = event.absolute;
+        const handleOrientation = (event) => {
+            rawHeading = event.alpha;
+            isAbsolute = event.absolute;
 
-                let heading = event.alpha;
-                if (typeof event.webkitCompassHeading !== 'undefined') {
-                    heading = event.webkitCompassHeading; // More reliable on iOS
-                }
+            let heading = event.alpha;
+            if (typeof event.webkitCompassHeading !== 'undefined') {
+                heading = event.webkitCompassHeading; // More reliable on iOS
+            }
 
-                if (smoothedOrientation === undefined) {
-                    smoothedOrientation = heading;
-                } else {
-                    const smoothingFactor = 0.4; // Increased for more responsiveness
-                    let diff = heading - smoothedOrientation;
+            if (smoothedOrientation === undefined) {
+                smoothedOrientation = heading;
+            } else {
+                const smoothingFactor = 0.4; // Increased for more responsiveness
+                let diff = heading - smoothedOrientation;
 
-                    // Handle wrap-around
-                    if (diff > 180) { diff -= 360; }
-                    if (diff < -180) { diff += 360; }
+                // Handle wrap-around
+                if (diff > 180) { diff -= 360; }
+                if (diff < -180) { diff += 360; }
 
-                    smoothedOrientation += diff * smoothingFactor;
+                smoothedOrientation += diff * smoothingFactor;
 
-                    // Keep it in the 0-360 range
-                    smoothedOrientation = (smoothedOrientation + 360) % 360;
-                }
+                // Keep it in the 0-360 range
+                smoothedOrientation = (smoothedOrientation + 360) % 360;
+            }
 
-                deviceOrientation = smoothedOrientation;
-                updateARView();
-            });
+            deviceOrientation = smoothedOrientation;
+            updateARView();
+        };
+
+        // Prioritize the 'absolute' event but fall back to the standard one
+        if (typeof window.DeviceOrientationAbsoluteEvent !== 'undefined') {
+            window.addEventListener('deviceorientationabsolute', handleOrientation);
+        } else if (window.DeviceOrientationEvent) {
+            window.addEventListener('deviceorientation', handleOrientation);
         } else {
             const msg = "Device orientation not available on this device.";
             instructions.innerHTML = `<p>${msg}</p>`;
@@ -156,6 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             content += `${key}: ${displayValue}<br>`;
         }
+        content += '<br><i>Note: Compass is relative to Magnetic North.</i>';
         diagnosticsOverlay.innerHTML = content;
     }
 
