@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let targetLocation;
     let deviceOrientation;
     let smoothedOrientation;
+    let rawHeading, isAbsolute;
 
     function logErrorToOverlay(message) {
         diagnosticsOverlay.innerHTML += `<br><span style="color: red;">ERROR: ${message}</span>`;
@@ -112,6 +113,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (window.DeviceOrientationEvent) {
             window.addEventListener('deviceorientation', (event) => {
+                rawHeading = event.alpha;
+                isAbsolute = event.absolute;
+
                 let heading = event.alpha;
                 if (typeof event.webkitCompassHeading !== 'undefined') {
                     heading = event.webkitCompassHeading; // More reliable on iOS
@@ -120,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (smoothedOrientation === undefined) {
                     smoothedOrientation = heading;
                 } else {
-                    const smoothingFactor = 0.1;
+                    const smoothingFactor = 0.4; // Increased for more responsiveness
                     let diff = heading - smoothedOrientation;
 
                     // Handle wrap-around
@@ -201,7 +205,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updateDiagnostics({
             userLocation,
             targetLocation,
-            deviceOrientation,
+            rawHeading,
+            smoothedOrientation: deviceOrientation,
+            isAbsolute,
             distance,
             bearing,
             angleDifference,
