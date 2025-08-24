@@ -4,11 +4,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const cameraFeed = document.getElementById('camera-feed');
     const arMarker = document.getElementById('ar-marker');
     const instructions = document.getElementById('instructions');
+    const diagnosticsOverlay = document.getElementById('diagnostics');
 
     let map;
     let userLocation;
     let targetLocation;
     let deviceOrientation;
+
+    function logErrorToOverlay(message) {
+        diagnosticsOverlay.innerHTML += `<br><span style="color: red;">ERROR: ${message}</span>`;
+    }
 
     // Initialize the map
     map = L.map('map').setView([0, 0], 2);
@@ -30,7 +35,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 L.marker(initialLocation).addTo(map).bindPopup("You are here").openPopup();
             },
             () => {
-                console.log("Could not get initial location. Using default view.");
+                const msg = "Could not get initial location. Using default view.";
+                console.log(msg);
+                logErrorToOverlay(msg);
             }
         );
     }
@@ -65,10 +72,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
                 .catch(err => {
                     console.error("Error accessing camera: ", err);
-                    instructions.innerHTML = '<p>Could not access the camera. Please enable camera permissions.</p>';
+                    const msg = "Could not access the camera. Please enable camera permissions.";
+                    instructions.innerHTML = `<p>${msg}</p>`;
+                    logErrorToOverlay(msg);
                 });
         } else {
-            instructions.innerHTML = '<p>Camera not available on this device.</p>';
+            const msg = "Camera not available on this device.";
+            instructions.innerHTML = `<p>${msg}</p>`;
+            logErrorToOverlay(msg);
         }
     }
 
@@ -87,11 +98,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 },
                 (err) => {
                     console.error("Error getting location: ", err);
-                    instructions.innerHTML = '<p>Could not get location. Please enable location services.</p>';
+                    const msg = "Could not get location. Please enable location services.";
+                    instructions.innerHTML = `<p>${msg}</p>`;
+                    logErrorToOverlay(msg);
                 }
             );
         } else {
-            instructions.innerHTML = '<p>Geolocation not available on this device.</p>';
+            const msg = "Geolocation not available on this device.";
+            instructions.innerHTML = `<p>${msg}</p>`;
+            logErrorToOverlay(msg);
         }
 
         if (window.DeviceOrientationEvent) {
@@ -101,8 +116,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 updateARView();
             });
         } else {
-            instructions.innerHTML = '<p>Device orientation not available on this device.</p>';
+            const msg = "Device orientation not available on this device.";
+            instructions.innerHTML = `<p>${msg}</p>`;
+            logErrorToOverlay(msg);
         }
+    }
+
+    function updateDiagnostics(data) {
+        let content = '--- Diagnostics ---<br>';
+        for (const [key, value] of Object.entries(data)) {
+            let displayValue = value;
+            if (typeof value === 'number') {
+                displayValue = value.toFixed(3);
+            }
+            if (typeof value === 'object' && value !== null) {
+                displayValue = JSON.stringify(value, (k, v) => (typeof v === 'number' ? v.toFixed(3) : v), 2);
+            }
+            content += `${key}: ${displayValue}<br>`;
+        }
+        diagnosticsOverlay.innerHTML = content;
     }
 
     function updateARView() {
@@ -144,6 +176,16 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             arMarker.style.display = 'none';
         }
+
+        updateDiagnostics({
+            userLocation,
+            targetLocation,
+            deviceOrientation,
+            distance,
+            bearing,
+            angleDifference,
+            markerSize
+        });
     }
 
     function calculateDistance(start, end) {
