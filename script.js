@@ -17,9 +17,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let logMessages = [];
 
     function logMessage(message, isError = false) {
-        const color = isError ? 'red' : 'white';
+        const color = isError ? 'red' : '#00ff00'; // Green for info
         const prefix = isError ? 'ERROR: ' : 'INFO: ';
-        logMessages.push(`<span style="color: ${color};">${prefix}${message}</span>`);
+        const logEntry = `<span style="color: ${color};">${prefix}${message}</span>`;
+        if (!logMessages.includes(logEntry)) {
+            logMessages.push(logEntry);
+        }
     }
 
     map = L.map('map').setView([0, 0], 2);
@@ -73,14 +76,15 @@ document.addEventListener('DOMContentLoaded', () => {
     function startSensors() {
         logMessage('Starting sensor initialization...');
         let kfX, kfY;
+        let isFilterAvailable = false;
 
         try {
             kfX = new KalmanFilter();
             kfY = new KalmanFilter();
+            isFilterAvailable = true;
             logMessage('Kalman filters initialized successfully.');
         } catch (e) {
-            logMessage(`CRITICAL: Failed to initialize KalmanFilter. Error: ${e.message}.`, true);
-            return;
+            logMessage(`KalmanFilter not available. Error: ${e.message}. Proceeding without smoothing.`, true);
         }
 
         let advancedSensorReadingReceived = false;
@@ -120,21 +124,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            const headingRad = heading * Math.PI / 180;
-            const x = Math.cos(headingRad);
-            const y = Math.sin(headingRad);
-
-            const filteredX = kfX.filter(x);
-            const filteredY = kfY.filter(y);
-
             let smoothedHeading;
-            if (isNaN(filteredX) || isNaN(filteredY)) {
-                smoothedHeading = heading;
+            if (isFilterAvailable) {
+                const headingRad = heading * Math.PI / 180;
+                const x = Math.cos(headingRad);
+                const y = Math.sin(headingRad);
+                const filteredX = kfX.filter(x);
+                const filteredY = kfY.filter(y);
+
+                if (isNaN(filteredX) || isNaN(filteredY)) {
+                    smoothedHeading = heading;
+                } else {
+                    const smoothedHeadingRad = Math.atan2(filteredY, filteredX);
+                    smoothedHeading = smoothedHeadingRad * 180 / Math.PI;
+                    smoothedHeading = (smoothedHeading + 360) % 360;
+                }
             } else {
-                const smoothedHeadingRad = Math.atan2(filteredY, filteredX);
-                smoothedHeading = smoothedHeadingRad * 180 / Math.PI;
-                smoothedHeading = (smoothedHeading + 360) % 360;
+                smoothedHeading = heading;
             }
+
             diagnosticData.magneticHeading = smoothedHeading.toFixed(2);
 
             const finalHeading = smoothedHeading + magneticDeclination;
@@ -154,12 +162,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (event.absolute === true) {
                     handleNewHeading(event.alpha, false);
                 } else {
-                    const message = "Compass is relative, which is not supported.";
-                    if (logMessages.every(m => !m.includes(message))) {
-                        logMessage(message, true);
-                        compassStatus.textContent = 'Compass: Relative (unsupported)';
-                        compassStatus.style.color = 'red';
-                    }
+                    logMessage("Compass is relative, which is not supported.", true);
+                    compassStatus.textContent = 'Compass: Relative (unsupported)';
+                    compassStatus.style.color = 'red';
                 }
             };
 
@@ -271,9 +276,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (angleDifference > 180) angleDifference -= 360;
         if (angleDifference < -180) angleDifference += 360;
 
-        diagnosticData.distance = distance;
-        diagnosticData.bearing = bearing;
-        diagnosticData.angleDifference = angleDifference;
+        diagnosticData.distance = distance.toFixed(2);
+        diagnosticData.bearing = bearing.toFixed(2);
+        diagnosticData.angleDifference = angleDifference.toFixed(2);
 
         if (Math.abs(angleDifference) < 2.0) {
             cameraContainer.classList.add('target-in-view');
@@ -286,7 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const maxDistanceForScaling = 100;
         const distanceRatio = Math.min(distance / maxDistanceForScaling, 1.0);
         const markerSize = minMarkerSize + distanceRatio * (maxMarkerSize - minMarkerSize);
-        diagnosticData.markerSize = markerSize;
+        diagnosticData.markerSize = markerSize.toFixed(2);
 
         arMarker.style.borderBottomWidth = `${markerSize}px`;
         arMarker.style.borderLeftWidth = `${markerSize / 2}px`;
