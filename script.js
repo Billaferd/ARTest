@@ -99,11 +99,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     logMessage('First advanced sensor reading received.');
                     advancedSensorReadingReceived = true;
                 }
-                // Data is a quaternion from AbsoluteOrientationSensor.
-                // The formula to convert a quaternion to yaw (heading) is atan2(2*(w*z + x*y), 1 - 2*(y^2 + z^2)).
-                // The quaternion order from the sensor is [x, y, z, w].
-                const q = data;
-                const yaw = Math.atan2(2 * (q[3] * q[2] + q[0] * q[1]), 1 - 2 * (q[1] * q[1] + q[2] * q[2]));
+                // Data is a quaternion from AbsoluteOrientationSensor, with order [x, y, z, w].
+                const { yaw } = quaternionToEuler(data); // returns {yaw, pitch, roll}
                 heading = yaw * 180 / Math.PI;
                 heading = (heading + 360) % 360;
             } else {
@@ -345,6 +342,31 @@ document.addEventListener('DOMContentLoaded', () => {
                   Math.sin(lat1) * Math.cos(lat2) * Math.cos(lng2 - lng1);
         const bearing = Math.atan2(y, x) * toDegrees;
         return (bearing + 360) % 360;
+    }
+
+    function quaternionToEuler(q) {
+        const [x, y, z, w] = q;
+
+        // roll (x-axis rotation)
+        const sinr_cosp = 2 * (w * x + y * z);
+        const cosr_cosp = 1 - 2 * (x * x + y * y);
+        const roll = Math.atan2(sinr_cosp, cosr_cosp);
+
+        // pitch (y-axis rotation)
+        const sinp = 2 * (w * y - z * x);
+        let pitch;
+        if (Math.abs(sinp) >= 1) {
+            pitch = Math.sign(sinp) * Math.PI / 2; // use 90 degrees if out of range
+        } else {
+            pitch = Math.asin(sinp);
+        }
+
+        // yaw (z-axis rotation)
+        const siny_cosp = 2 * (w * z + x * y);
+        const cosy_cosp = 1 - 2 * (y * y + z * z);
+        const yaw = Math.atan2(siny_cosp, cosy_cosp);
+
+        return { yaw, pitch, roll };
     }
 
     setInterval(() => updateDiagnostics(diagnosticData), 250);
