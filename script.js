@@ -6,17 +6,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const instructions = document.getElementById('instructions');
     const diagnosticsOverlay = document.getElementById('diagnostics');
     const compassStatus = document.getElementById('compass-status');
-    const kalmanFilterBtn = document.getElementById('kalman-filter-btn');
 
     let map;
     let userLocation;
     let targetLocation;
     let deviceOrientation;
-    let smoothedOrientation;
     let magneticDeclination = 0;
 
     let diagnosticData = {};
-    let orientationListener = null;
 
     function logErrorToOverlay(message) {
         diagnosticsOverlay.innerHTML += `<br><span style="color: red;">ERROR: ${message}</span>`;
@@ -27,6 +24,15 @@ document.addEventListener('DOMContentLoaded', () => {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
+
+    // Get initial location to center map
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((position) => {
+            const initialLocation = { lat: position.coords.latitude, lng: position.coords.longitude };
+            map.setView(initialLocation, 16);
+            L.marker(initialLocation).addTo(map).bindPopup("You are here").openPopup();
+        }, null, { enableHighAccuracy: true });
+    }
 
     map.on('click', (e) => {
         targetLocation = e.latlng;
@@ -44,6 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
         arMarker.style.display = 'block';
 
         startCamera();
+        startSensors(); // Sensors are now started on click
     });
 
     function startCamera() {
@@ -62,107 +69,21 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startSensors() {
-        if (navigator.geolocation) {
-            navigator.geolocation.watchPosition(
-                (position) => {
-                    userLocation = {
-                        lat: position.coords.latitude,
-                        lng: position.coords.longitude
-                    };
-                    diagnosticData.userLocation = userLocation;
+        const kfX = new KalmanFilter();
+        const kfY = new KalmanFilter();
 
-                    if (!map.isUserLocationSet) {
-                        map.setView(userLocation, 16);
-                        map.isUserLocationSet = true;
-                        L.marker(userLocation).addTo(map).bindPopup("You are here").openPopup();
+        const handleNewHeading = (heading, isAbsolute) => {
+            diagnosticData.rawHeading = heading;
+            diagnosticData.isAbsolute = isAbsolute;
 
-                        if (typeof geomagnetism !== 'undefined') {
-                            const model = geomagnetism.model(new Date());
-                            const point = model.point([userLocation.lat, userLocation.lng]);
-                            magneticDeclination = point.decl;
-                            diagnosticData.magneticDeclination = magneticDeclination;
-                        }
-                    }
-                },
-                (err) => {
-                    logErrorToOverlay("Could not get location.");
-                },
-                { enableHighAccuracy: true }
-            );
-        } else {
-            logErrorToOverlay("Geolocation not available.");
-        }
-
-        // Default orientation handler using deviceorientation
-        const handleOrientationEvent = (event) => {
-            diagnosticData.rawHeading = event.alpha;
-            diagnosticData.isAbsolute = event.absolute;
-
-            if (compassStatus.innerHTML === '') {
-                if (event.absolute) {
+            if (compassStatus.innerHTML === '' || compassStatus.style.color !== 'cyan') {
+                if (isAbsolute) {
                     compassStatus.textContent = 'Compass: Absolute';
                     compassStatus.style.color = 'limegreen';
                 } else {
                     compassStatus.textContent = 'Compass: Relative';
                     compassStatus.style.color = 'orange';
                 }
-            }
-
-            let heading = event.alpha;
-            if (typeof event.webkitCompassHeading !== 'undefined') {
-                heading = event.webkitCompassHeading;
-            }
-
-            if (smoothedOrientation === undefined) {
-                smoothedOrientation = heading;
-            } else {
-                const smoothingFactor = 0.4;
-                let diff = heading - smoothedOrientation;
-                if (diff > 180) diff -= 360;
-                if (diff < -180) diff += 360;
-                smoothedOrientation += diff * smoothingFactor;
-                smoothedOrientation = (smoothedOrientation + 360) % 360;
-            }
-            diagnosticData.magneticHeading = smoothedOrientation;
-
-            const trueHeading = smoothedOrientation + magneticDeclination;
-            deviceOrientation = (trueHeading + 360) % 360;
-            diagnosticData.trueHeading = deviceOrientation;
-
-            updateARView();
-        };
-
-        orientationListener = handleOrientationEvent;
-        window.addEventListener('deviceorientation', orientationListener);
-    }
-
-    kalmanFilterBtn.addEventListener('click', () => {
-        if (typeof KalmanFilter === 'undefined') {
-            logErrorToOverlay('KalmanFilter library not loaded.');
-            kalmanFilterBtn.disabled = true;
-            return;
-        }
-
-        // Remove the old listener
-        if (orientationListener) {
-            window.removeEventListener('deviceorientation', orientationListener);
-            orientationListener = null;
-        }
-
-        const kfX = new KalmanFilter();
-        const kfY = new KalmanFilter();
-
-        const handleKalmanOrientation = (event) => {
-            let heading = event.alpha;
-            if (typeof event.webkitCompassHeading !== 'undefined') {
-                heading = event.webkitCompassHeading;
-            }
-            diagnosticData.rawHeading = heading;
-            diagnosticData.isAbsolute = event.absolute;
-
-            if (compassStatus.innerHTML.indexOf('Kalman') === -1) {
-                compassStatus.textContent = 'Compass: Kalman';
-                compassStatus.style.color = 'cyan';
             }
 
             const headingRad = heading * Math.PI / 180;
@@ -182,24 +103,83 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             diagnosticData.magneticHeading = smoothedHeading;
 
-            const trueHeading = smoothedHeading + magneticDeclination;
-            deviceOrientation = (trueHeading + 360) % 360;
+            const finalHeading = smoothedHeading + magneticDeclination;
+            deviceOrientation = (finalHeading + 360) % 360;
             diagnosticData.trueHeading = deviceOrientation;
 
             updateARView();
         };
 
-        orientationListener = handleKalmanOrientation;
-        // The modern sensor is still not trusted, so we use the legacy one
-        if (typeof window.DeviceOrientationAbsoluteEvent !== 'undefined') {
-            window.addEventListener('deviceorientationabsolute', orientationListener);
+        const setupLegacyListener = () => {
+            const handleOrientationEvent = (event) => {
+                let heading = event.alpha;
+                if (typeof event.webkitCompassHeading !== 'undefined') {
+                    heading = event.webkitCompassHeading;
+                }
+                handleNewHeading(heading, event.absolute);
+            };
+            if (typeof window.DeviceOrientationAbsoluteEvent !== 'undefined') {
+                window.addEventListener('deviceorientationabsolute', handleOrientationEvent);
+            } else if (window.DeviceOrientationEvent) {
+                window.addEventListener('deviceorientation', handleOrientationEvent);
+            } else {
+                logErrorToOverlay("Device orientation not available.");
+            }
+        };
+
+        if ('AbsoluteOrientationSensor' in window) {
+            try {
+                const sensor = new AbsoluteOrientationSensor({ frequency: 60 });
+                sensor.onreading = () => {
+                    compassStatus.textContent = 'Compass: Advanced';
+                    compassStatus.style.color = 'cyan';
+                    const q = sensor.quaternion;
+                    const yaw = Math.atan2(2 * (q[3] * q[2] + q[0] * q[1]), 1 - 2 * (q[1] * q[1] + q[2] * q[2]));
+                    let heading = yaw * 180 / Math.PI;
+                    if (heading < 0) heading += 360;
+                    handleNewHeading(heading, true);
+                };
+                sensor.onerror = (event) => {
+                    logErrorToOverlay(`Advanced Sensor Error: ${event.error.name}`);
+                    setupLegacyListener();
+                };
+                sensor.start();
+            } catch (error) {
+                logErrorToOverlay(`Advanced Sensor failed to start: ${error.message}`);
+                setupLegacyListener();
+            }
         } else {
-            window.addEventListener('deviceorientation', orientationListener);
+            setupLegacyListener();
         }
 
-        kalmanFilterBtn.textContent = 'Kalman Filter Active';
-        kalmanFilterBtn.disabled = true;
-    });
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(
+                (position) => {
+                    userLocation = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+                    diagnosticData.userLocation = userLocation;
+
+                    if (!map.isUserLocationSet) {
+                        map.isUserLocationSet = true; // Only do this once
+                        if (typeof geomagnetism !== 'undefined') {
+                            const model = geomagnetism.model(new Date());
+                            const point = model.point([userLocation.lat, userLocation.lng]);
+                            magneticDeclination = point.decl;
+                            diagnosticData.magneticDeclination = magneticDeclination;
+                        }
+                    }
+                },
+                (err) => {
+                    logErrorToOverlay("Could not get location.");
+                },
+                { enableHighAccuracy: true }
+            );
+        } else {
+            logErrorToOverlay("Geolocation not available.");
+        }
+    }
 
     function updateDiagnostics(data) {
         let content = '--- Diagnostics ---<br>';
@@ -285,6 +265,5 @@ document.addEventListener('DOMContentLoaded', () => {
         return (bearing + 360) % 360;
     }
 
-    startSensors();
     setInterval(() => updateDiagnostics(diagnosticData), 250);
 });
