@@ -145,7 +145,7 @@ document.addEventListener('DOMContentLoaded', () => {
             diagnosticData.magneticHeading = smoothedHeading.toFixed(2);
 
             const finalHeading = smoothedHeading + magneticDeclination;
-            deviceOrientation = (finalHeading + 360) % 360;
+            deviceOrientation = (finalHeading + 180 + 360) % 360;
             diagnosticData.trueHeading = deviceOrientation.toFixed(2);
 
             updateARView();
