@@ -163,21 +163,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         if ('AbsoluteOrientationSensor' in window) {
-            Promise.all([
-                navigator.permissions.query({ name: "accelerometer" }),
-                navigator.permissions.query({ name: "magnetometer" }),
-                navigator.permissions.query({ name: "gyroscope" }),
-            ]).then((results) => {
-                if (results.every((result) => result.state === "granted")) {
-                    startAdvancedSensor();
-                } else {
-                    logErrorToOverlay("Permissions not granted for advanced sensor. Falling back.");
-                    setupLegacyListener();
-                }
-            }).catch(err => {
-                logErrorToOverlay("Error querying permissions. Falling back.");
-                setupLegacyListener();
-            });
+            startAdvancedSensor();
         } else {
             setupLegacyListener();
         }
