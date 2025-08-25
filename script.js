@@ -6,12 +6,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const instructions = document.getElementById('instructions');
     const diagnosticsOverlay = document.getElementById('diagnostics');
     const compassStatus = document.getElementById('compass-status');
+    const gpsCalCheckbox = document.getElementById('gps-cal-checkbox');
+
+    const GPS_BUFFER_SIZE = 1000;
+    let gpsLocationBuffer = [];
 
     let map;
     let userLocation;
     let targetLocation;
     let deviceOrientation;
     let magneticDeclination = 0;
+    let gpsCalibrationOffset = 0;
+    let gpsCalInterval = null;
 
     let diagnosticData = {};
 
@@ -62,6 +68,95 @@ document.addEventListener('DOMContentLoaded', () => {
         const kfX = new KalmanFilter();
         const kfY = new KalmanFilter();
 
+        const handleNewHeading = (heading, isAbsolute) => {
+            diagnosticData.rawHeading = heading;
+            diagnosticData.isAbsolute = isAbsolute;
+
+            if (compassStatus.innerHTML === '') {
+                if (isAbsolute) {
+                    compassStatus.textContent = 'Compass: Absolute';
+                    compassStatus.style.color = 'limegreen';
+                } else {
+                    compassStatus.textContent = 'Compass: Relative';
+                    compassStatus.style.color = 'orange';
+                }
+            }
+
+            const headingRad = heading * Math.PI / 180;
+            const x = Math.cos(headingRad);
+            const y = Math.sin(headingRad);
+
+            const filteredX = kfX.filter(x);
+            const filteredY = kfY.filter(y);
+
+            let smoothedHeading;
+            if (isNaN(filteredX) || isNaN(filteredY)) {
+                smoothedHeading = heading;
+                logErrorToOverlay("Kalman filter returned NaN.");
+            } else {
+                const smoothedHeadingRad = Math.atan2(filteredY, filteredX);
+                smoothedHeading = smoothedHeadingRad * 180 / Math.PI;
+                smoothedHeading = (smoothedHeading + 360) % 360;
+            }
+            diagnosticData.magneticHeading = smoothedHeading;
+
+            let finalHeading;
+            if (gpsCalCheckbox.checked && !isAbsolute) {
+                finalHeading = heading + gpsCalibrationOffset;
+            } else {
+                finalHeading = smoothedHeading + magneticDeclination;
+            }
+            deviceOrientation = (finalHeading + 360) % 360;
+            diagnosticData.trueHeading = deviceOrientation;
+
+            updateARView();
+        };
+
+        if ('AbsoluteOrientationSensor' in window) {
+            try {
+                const sensor = new AbsoluteOrientationSensor({ frequency: 60 });
+                sensor.onreading = () => {
+                    const q = sensor.quaternion;
+                    const yaw = Math.atan2(2 * (q[3] * q[2] + q[0] * q[1]), 1 - 2 * (q[1] * q[1] + q[2] * q[2]));
+                    let heading = yaw * 180 / Math.PI;
+                    if (heading < 0) heading += 360;
+                    handleNewHeading(heading, true);
+                };
+                sensor.onerror = (event) => {
+                    if (event.error.name === 'NotAllowedError') {
+                        logErrorToOverlay("Sensor permission denied.");
+                    } else if (event.error.name === 'NotReadableError') {
+                        logErrorToOverlay("Cannot read sensor.");
+                    }
+                    setupDeviceOrientationListener();
+                };
+                sensor.start();
+            } catch (error) {
+                logErrorToOverlay("AbsoluteOrientationSensor failed to start.");
+                setupDeviceOrientationListener();
+            }
+        } else {
+            setupDeviceOrientationListener();
+        }
+
+        function setupDeviceOrientationListener() {
+             const handleOrientationEvent = (event) => {
+                let heading = event.alpha;
+                if (typeof event.webkitCompassHeading !== 'undefined') {
+                    heading = event.webkitCompassHeading;
+                }
+                handleNewHeading(heading, event.absolute);
+            };
+
+            if (typeof window.DeviceOrientationAbsoluteEvent !== 'undefined') {
+                window.addEventListener('deviceorientationabsolute', handleOrientationEvent);
+            } else if (window.DeviceOrientationEvent) {
+                window.addEventListener('deviceorientation', handleOrientationEvent);
+            } else {
+                logErrorToOverlay("Device orientation not available.");
+            }
+        }
+
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(
                 (position) => {
@@ -70,6 +165,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         lng: position.coords.longitude
                     };
                     diagnosticData.userLocation = userLocation;
+
+                    gpsLocationBuffer.push(userLocation);
+                    if (gpsLocationBuffer.length > GPS_BUFFER_SIZE) {
+                        gpsLocationBuffer.shift();
+                    }
 
                     if (!map.isUserLocationSet) {
                         map.setView(userLocation, 16);
@@ -91,58 +191,6 @@ document.addEventListener('DOMContentLoaded', () => {
             );
         } else {
             logErrorToOverlay("Geolocation not available.");
-        }
-
-        const handleOrientation = (event) => {
-            diagnosticData.rawHeading = event.alpha;
-            diagnosticData.isAbsolute = event.absolute;
-
-            if (compassStatus.innerHTML === '') {
-                if (event.absolute) {
-                    compassStatus.textContent = 'Compass: Absolute';
-                    compassStatus.style.color = 'limegreen';
-                } else {
-                    compassStatus.textContent = 'Compass: Relative';
-                    compassStatus.style.color = 'orange';
-                }
-            }
-
-            let heading = event.alpha;
-            if (typeof event.webkitCompassHeading !== 'undefined') {
-                heading = event.webkitCompassHeading;
-            }
-
-            const headingRad = heading * Math.PI / 180;
-            const x = Math.cos(headingRad);
-            const y = Math.sin(headingRad);
-
-            const filteredX = kfX.filter(x);
-            const filteredY = kfY.filter(y);
-
-            let smoothedHeading;
-            if (isNaN(filteredX) || isNaN(filteredY)) {
-                smoothedHeading = heading;
-                logErrorToOverlay("Kalman filter returned NaN.");
-            } else {
-                const smoothedHeadingRad = Math.atan2(filteredY, filteredX);
-                smoothedHeading = smoothedHeadingRad * 180 / Math.PI;
-                smoothedHeading = (smoothedHeading + 360) % 360;
-            }
-            diagnosticData.magneticHeading = smoothedHeading;
-
-            const finalHeading = smoothedHeading + magneticDeclination;
-            deviceOrientation = (finalHeading + 360) % 360;
-            diagnosticData.trueHeading = deviceOrientation;
-
-            updateARView();
-        };
-
-        if (typeof window.DeviceOrientationAbsoluteEvent !== 'undefined') {
-            window.addEventListener('deviceorientationabsolute', handleOrientation);
-        } else if (window.DeviceOrientationEvent) {
-            window.addEventListener('deviceorientation', handleOrientation);
-        } else {
-            logErrorToOverlay("Device orientation not available.");
         }
     }
 
@@ -229,6 +277,44 @@ document.addEventListener('DOMContentLoaded', () => {
         const bearing = Math.atan2(y, x) / toRadians;
         return (bearing + 360) % 360;
     }
+
+    function calculateGpsMajorityVote() {
+        if (gpsLocationBuffer.length < 2) return null;
+        const bearings = [];
+        for (let i = 0; i < gpsLocationBuffer.length - 1; i++) {
+            bearings.push(calculateBearing(gpsLocationBuffer[i], gpsLocationBuffer[i+1]));
+        }
+        const bins = new Array(8).fill(0);
+        const binSize = 45;
+        bearings.forEach(b => {
+            const adjustedBearing = (b + binSize / 2) % 360;
+            const binIndex = Math.floor(adjustedBearing / binSize);
+            bins[binIndex]++;
+        });
+        let maxVotes = 0;
+        let winningBinIndex = -1;
+        bins.forEach((votes, i) => {
+            if (votes > maxVotes) {
+                maxVotes = votes;
+                winningBinIndex = i;
+            }
+        });
+        return winningBinIndex !== -1 ? winningBinIndex * binSize : null;
+    }
+
+    gpsCalCheckbox.addEventListener('change', (e) => {
+        if (e.target.checked) {
+            gpsCalInterval = setInterval(() => {
+                const votedDirection = calculateGpsMajorityVote();
+                if (votedDirection !== null && diagnosticData.rawHeading !== undefined) {
+                    gpsCalibrationOffset = votedDirection - diagnosticData.rawHeading;
+                }
+            }, 5000);
+        } else {
+            if (gpsCalInterval) clearInterval(gpsCalInterval);
+            gpsCalibrationOffset = 0;
+        }
+    });
 
     startSensors();
     setInterval(() => updateDiagnostics(diagnosticData), 250);
