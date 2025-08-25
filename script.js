@@ -99,10 +99,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     logMessage('First advanced sensor reading received.');
                     advancedSensorReadingReceived = true;
                 }
-                // Data is a quaternion from AbsoluteOrientationSensor, with order [x, y, z, w].
-                const { yaw } = quaternionToEuler(data); // returns {yaw, pitch, roll}
-                heading = yaw * 180 / Math.PI;
+                // Data is a quaternion from AbsoluteOrientationSensor.
+                const euler = quaternionToEuler(data);
+                heading = euler.yaw * 180 / Math.PI;
                 heading = (heading + 360) % 360;
+
             } else {
                 if (!legacySensorReadingReceived) {
                     logMessage('First legacy sensor reading received.');
@@ -142,8 +143,13 @@ document.addEventListener('DOMContentLoaded', () => {
             diagnosticData.magneticHeading = smoothedHeading.toFixed(2);
 
             const finalHeading = smoothedHeading + magneticDeclination;
-            deviceOrientation = (finalHeading + 360) % 360;
-            diagnosticData.trueHeading = deviceOrientation.toFixed(2);
+            diagnosticData.trueHeading = ((finalHeading + 360) % 360).toFixed(2);
+
+            // *** NEW: Correct for screen orientation ***
+            const screenOrientationAngle = screen.orientation.angle || 0;
+            deviceOrientation = (finalHeading - screenOrientationAngle + 360) % 360;
+            diagnosticData.screenCorrectedHeading = deviceOrientation.toFixed(2);
+
 
             updateARView();
         };
