@@ -20,10 +20,6 @@ document.addEventListener('DOMContentLoaded', () => {
     let gpsCalibrationOffset = 0;
     let gpsCalInterval = null;
 
-    // Kalman filters for smoothing the x and y components of the heading vector
-    const kfX = new KalmanFilter({R: 0.1, Q: 2});
-    const kfY = new KalmanFilter({R: 0.1, Q: 2});
-
     function logErrorToOverlay(message) {
         diagnosticsOverlay.innerHTML += `<br><span style="color: red;">ERROR: ${message}</span>`;
     }
@@ -105,6 +101,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startSensors() {
+        // Kalman filters for smoothing the x and y components of the heading vector
+        const kfX = new KalmanFilter({R: 0.1, Q: 2});
+        const kfY = new KalmanFilter({R: 0.1, Q: 2});
+
         if (navigator.geolocation) {
             navigator.geolocation.watchPosition(
                 (position) => {
