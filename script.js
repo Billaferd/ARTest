@@ -6,18 +6,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const instructions = document.getElementById('instructions');
     const diagnosticsOverlay = document.getElementById('diagnostics');
     const compassStatus = document.getElementById('compass-status');
-    const gpsCalCheckbox = document.getElementById('gps-cal-checkbox');
-
-    const GPS_BUFFER_SIZE = 1000;
-    let gpsLocationBuffer = [];
 
     let map;
     let userLocation;
     let targetLocation;
     let deviceOrientation;
     let magneticDeclination = 0;
-    let gpsCalibrationOffset = 0;
-    let gpsCalInterval = null;
 
     let diagnosticData = {};
 
@@ -76,11 +70,6 @@ document.addEventListener('DOMContentLoaded', () => {
                         lng: position.coords.longitude
                     };
                     diagnosticData.userLocation = userLocation;
-
-                    gpsLocationBuffer.push(userLocation);
-                    if (gpsLocationBuffer.length > GPS_BUFFER_SIZE) {
-                        gpsLocationBuffer.shift();
-                    }
 
                     if (!map.isUserLocationSet) {
                         map.setView(userLocation, 16);
@@ -141,14 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             diagnosticData.magneticHeading = smoothedHeading;
 
-            let finalHeading;
-            if (gpsCalCheckbox.checked && !diagnosticData.isAbsolute) {
-                // Apply GPS calibration offset only if compass is relative
-                finalHeading = heading + gpsCalibrationOffset;
-            } else {
-                // Apply magnetic declination to get True North heading
-                finalHeading = smoothedHeading + magneticDeclination;
-            }
+            const finalHeading = smoothedHeading + magneticDeclination;
             deviceOrientation = (finalHeading + 360) % 360;
             diagnosticData.trueHeading = deviceOrientation;
 
@@ -247,44 +229,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const bearing = Math.atan2(y, x) / toRadians;
         return (bearing + 360) % 360;
     }
-
-    function calculateGpsMajorityVote() {
-        if (gpsLocationBuffer.length < 2) return null;
-        const bearings = [];
-        for (let i = 0; i < gpsLocationBuffer.length - 1; i++) {
-            bearings.push(calculateBearing(gpsLocationBuffer[i], gpsLocationBuffer[i+1]));
-        }
-        const bins = new Array(8).fill(0);
-        const binSize = 45;
-        bearings.forEach(b => {
-            const adjustedBearing = (b + binSize / 2) % 360;
-            const binIndex = Math.floor(adjustedBearing / binSize);
-            bins[binIndex]++;
-        });
-        let maxVotes = 0;
-        let winningBinIndex = -1;
-        bins.forEach((votes, i) => {
-            if (votes > maxVotes) {
-                maxVotes = votes;
-                winningBinIndex = i;
-            }
-        });
-        return winningBinIndex !== -1 ? winningBinIndex * binSize : null;
-    }
-
-    gpsCalCheckbox.addEventListener('change', (e) => {
-        if (e.target.checked) {
-            gpsCalInterval = setInterval(() => {
-                const votedDirection = calculateGpsMajorityVote();
-                if (votedDirection !== null && diagnosticData.rawHeading !== undefined) {
-                    gpsCalibrationOffset = votedDirection - diagnosticData.rawHeading;
-                }
-            }, 5000);
-        } else {
-            if (gpsCalInterval) clearInterval(gpsCalInterval);
-            gpsCalibrationOffset = 0;
-        }
-    });
 
     startSensors();
     setInterval(() => updateDiagnostics(diagnosticData), 250);
