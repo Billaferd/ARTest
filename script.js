@@ -112,11 +112,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const setupLegacyListener = () => {
             const handleOrientationEvent = (event) => {
-                let heading = event.alpha;
+                // Prefer webkitCompassHeading as it's absolute
                 if (typeof event.webkitCompassHeading !== 'undefined') {
-                    heading = event.webkitCompassHeading;
+                    handleNewHeading(event.webkitCompassHeading, true);
+                    return;
                 }
-                handleNewHeading(heading, event.absolute);
+
+                // Fallback to alpha, but only if it's absolute
+                if (event.absolute === true) {
+                    handleNewHeading(event.alpha, true);
+                } else {
+                    const message = "Compass is relative, which is not supported by this AR experience.";
+                    if (!diagnosticsOverlay.innerHTML.includes(message)) {
+                        logErrorToOverlay(message);
+                        compassStatus.textContent = 'Compass: Relative (unsupported)';
+                        compassStatus.style.color = 'red';
+                    }
+                }
             };
             if (typeof window.DeviceOrientationAbsoluteEvent !== 'undefined') {
                 window.addEventListener('deviceorientationabsolute', handleOrientationEvent);
