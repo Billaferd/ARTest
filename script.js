@@ -6,6 +6,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const instructions = document.getElementById('instructions');
     const diagnosticsOverlay = document.getElementById('diagnostics');
     const compassStatus = document.getElementById('compass-status');
+    const gpsCalCheckbox = document.getElementById('gps-cal-checkbox');
+
+    const GPS_BUFFER_SIZE = 100;
+    let gpsLocationBuffer = [];
 
     let map;
     let userLocation;
@@ -13,6 +17,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let deviceOrientation;
     let rawHeading, isAbsolute;
     let magneticDeclination = 0; // Default to 0
+    let gpsCalibrationOffset = 0;
+    let gpsCalInterval = null;
 
     // Kalman filters for smoothing the x and y components of the heading vector
     const kfX = new KalmanFilter({R: 0.1, Q: 2});
@@ -106,6 +112,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         lat: position.coords.latitude,
                         lng: position.coords.longitude
                     };
+
+                    // Add to GPS buffer
+                    gpsLocationBuffer.push(userLocation);
+                    if (gpsLocationBuffer.length > GPS_BUFFER_SIZE) {
+                        gpsLocationBuffer.shift();
+                    }
+
                     if (!map.isUserLocationSet) {
                         map.setView(userLocation, 16);
                         map.isUserLocationSet = true;
@@ -158,9 +171,15 @@ document.addEventListener('DOMContentLoaded', () => {
             let smoothedHeading = smoothedHeadingRad * 180 / Math.PI;
             smoothedHeading = (smoothedHeading + 360) % 360;
 
-            // Apply magnetic declination to get True North heading
-            const trueHeading = smoothedHeading + magneticDeclination;
-            deviceOrientation = (trueHeading + 360) % 360;
+            let finalHeading;
+            if (gpsCalCheckbox.checked) {
+                // Apply GPS calibration offset
+                finalHeading = rawHeading + gpsCalibrationOffset;
+            } else {
+                // Apply magnetic declination to get True North heading
+                finalHeading = smoothedHeading + magneticDeclination;
+            }
+            deviceOrientation = (finalHeading + 360) % 360;
 
             updateARView();
         };
@@ -284,4 +303,61 @@ document.addEventListener('DOMContentLoaded', () => {
 
         return (bearing + 360) % 360; // Normalize to 0-360
     }
+
+    function calculateGpsMajorityVote() {
+        if (gpsLocationBuffer.length < 2) {
+            return null;
+        }
+
+        const bearings = [];
+        for (let i = 0; i < gpsLocationBuffer.length - 1; i++) {
+            const bearing = calculateBearing(gpsLocationBuffer[i], gpsLocationBuffer[i+1]);
+            bearings.push(bearing);
+        }
+
+        // Quantize into 8 bins (N, NE, E, SE, S, SW, W, NW)
+        const bins = new Array(8).fill(0);
+        const binSize = 45; // 360 / 8
+        bearings.forEach(b => {
+            // Offset by half a bin to center the bins on N, NE, etc.
+            const adjustedBearing = (b + binSize / 2) % 360;
+            const binIndex = Math.floor(adjustedBearing / binSize);
+            bins[binIndex]++;
+        });
+
+        // Find the bin with the most votes
+        let maxVotes = 0;
+        let winningBinIndex = -1;
+        for (let i = 0; i < bins.length; i++) {
+            if (bins[i] > maxVotes) {
+                maxVotes = bins[i];
+                winningBinIndex = i;
+            }
+        }
+
+        if (winningBinIndex !== -1) {
+            // Return the center angle of the winning bin
+            return winningBinIndex * binSize;
+        }
+
+        return null;
+    }
+
+    gpsCalCheckbox.addEventListener('change', (e) => {
+        if (e.target.checked) {
+            // Start polling GPS for calibration
+            gpsCalInterval = setInterval(() => {
+                const votedDirection = calculateGpsMajorityVote();
+                if (votedDirection !== null && rawHeading !== undefined) {
+                    gpsCalibrationOffset = votedDirection - rawHeading;
+                }
+            }, 5000); // Recalculate every 5 seconds
+        } else {
+            // Stop polling and reset
+            if (gpsCalInterval) {
+                clearInterval(gpsCalInterval);
+            }
+            gpsCalibrationOffset = 0;
+        }
+    });
 });
