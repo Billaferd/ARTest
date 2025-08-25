@@ -226,17 +226,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!map.isUserLocationSet) {
                         map.isUserLocationSet = true;
                         logMessage('Calculating magnetic declination...');
-                        if (typeof geomagnetism !== 'undefined') {
-                            // Handle UMD module loading where the main export might be on the .default property.
-                            const geo = geomagnetism.default || geomagnetism;
-                            const model = geo.model(new Date());
-                            const point = model.point([userLocation.lat, userLocation.lng]);
-                            magneticDeclination = point.decl;
+                        if (typeof geomag !== 'undefined') {
+                            const field = geomag.field(userLocation.lat, userLocation.lng);
+                            magneticDeclination = field.declination;
                             isDeclinationAvailable = true;
                             diagnosticData.magneticDeclination = magneticDeclination.toFixed(2);
                             logMessage(`Magnetic declination set to: ${magneticDeclination.toFixed(2)}`);
                         } else {
-                            logMessage('Geomagnetism library not available. Compass will use Magnetic North.', true);
+                            logMessage('Geomag library not available. Compass will use Magnetic North.', true);
                         }
                     }
                 },
