@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let targetLocation;
     let deviceOrientation;
     let magneticDeclination = 0;
+    let isDeclinationAvailable = false;
 
     let diagnosticData = {};
     let logMessages = [];
@@ -98,9 +99,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     logMessage('First advanced sensor reading received.');
                     advancedSensorReadingReceived = true;
                 }
+                // Data is a quaternion from AbsoluteOrientationSensor.
+                // The formula to convert a quaternion to yaw (heading) is atan2(2*(w*z + x*y), 1 - 2*(y^2 + z^2)).
+                // The quaternion order from the sensor is [x, y, z, w].
                 const q = data;
                 const yaw = Math.atan2(2 * (q[3] * q[2] + q[0] * q[1]), 1 - 2 * (q[1] * q[1] + q[2] * q[2]));
                 heading = yaw * 180 / Math.PI;
+                // Based on testing and polyfill examples, the heading from the formula is inverted.
                 heading = 360 - heading;
                 heading = (heading + 360) % 360;
             } else {
@@ -108,21 +113,17 @@ document.addEventListener('DOMContentLoaded', () => {
                     logMessage('First legacy sensor reading received.');
                     legacySensorReadingReceived = true;
                 }
+                // Data is a heading number from legacy events.
                 heading = data;
             }
 
             diagnosticData.rawHeading = heading.toFixed(2);
             diagnosticData.isAbsolute = isAbsolute;
 
-            if (compassStatus.innerHTML === '' || compassStatus.style.color !== 'cyan') {
-                if (isAbsolute) {
-                    compassStatus.textContent = 'Compass: Advanced';
-                    compassStatus.style.color = 'cyan';
-                } else {
-                    compassStatus.textContent = 'Compass: Legacy';
-                    compassStatus.style.color = 'orange';
-                }
-            }
+            const compassType = isAbsolute ? 'Advanced' : 'Legacy';
+            const headingType = isDeclinationAvailable ? 'True' : 'Magnetic';
+            compassStatus.textContent = `Compass: ${compassType} (${headingType})`;
+            compassStatus.style.color = isAbsolute ? 'cyan' : 'orange';
 
             let smoothedHeading;
             if (isFilterAvailable) {
@@ -231,10 +232,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             const model = geomagnetism.model(new Date());
                             const point = model.point([userLocation.lat, userLocation.lng]);
                             magneticDeclination = point.decl;
+                            isDeclinationAvailable = true;
                             diagnosticData.magneticDeclination = magneticDeclination.toFixed(2);
                             logMessage(`Magnetic declination set to: ${magneticDeclination.toFixed(2)}`);
                         } else {
-                            logMessage('Geomagnetism library not available.', true);
+                            logMessage('Geomagnetism library not available. Compass will use Magnetic North.', true);
                         }
                     }
                 },
@@ -308,8 +310,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    /**
+     * Calculates the distance between two GPS coordinates in kilometers.
+     * Uses the Haversine formula.
+     * @param {object} start - The starting coordinate {lat, lng}.
+     * @param {object} end - The ending coordinate {lat, lng}.
+     * @returns {number} The distance in kilometers.
+     */
     function calculateDistance(start, end) {
-        const R = 6371;
+        const R = 6371; // Earth's radius in kilometers
         const toRadians = Math.PI / 180;
         const dLat = (end.lat - start.lat) * toRadians;
         const dLon = (end.lng - start.lng) * toRadians;
@@ -321,8 +330,15 @@ document.addEventListener('DOMContentLoaded', () => {
         return R * c;
     }
 
+    /**
+     * Calculates the initial bearing (forward azimuth) from one GPS coordinate to another.
+     * @param {object} start - The starting coordinate {lat, lng}.
+     * @param {object} end - The ending coordinate {lat, lng}.
+     * @returns {number} The bearing in degrees (0-360).
+     */
     function calculateBearing(start, end) {
         const toRadians = Math.PI / 180;
+        const toDegrees = 180 / Math.PI;
         const lat1 = start.lat * toRadians;
         const lng1 = start.lng * toRadians;
         const lat2 = end.lat * toRadians;
@@ -330,7 +346,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const y = Math.sin(lng2 - lng1) * Math.cos(lat2);
         const x = Math.cos(lat1) * Math.sin(lat2) -
                   Math.sin(lat1) * Math.cos(lat2) * Math.cos(lng2 - lng1);
-        const bearing = Math.atan2(y, x) / toRadians;
+        const bearing = Math.atan2(y, x) * toDegrees;
         return (bearing + 360) % 360;
     }
 
