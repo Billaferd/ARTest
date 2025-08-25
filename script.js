@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let deviceOrientation;
     let smoothedOrientation;
     let rawHeading, isAbsolute;
+    let magneticDeclination = 0; // Default to 0
 
     let diagnosticData = {};
 
@@ -73,6 +74,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         map.setView(userLocation, 16);
                         map.isUserLocationSet = true;
                         L.marker(userLocation).addTo(map).bindPopup("You are here").openPopup();
+
+                        // Calculate magnetic declination
+                        if (typeof geomagnetism !== 'undefined') {
+                            const model = geomagnetism.model(new Date());
+                            const point = model.point([userLocation.lat, userLocation.lng]);
+                            magneticDeclination = point.decl;
+                            diagnosticData.magneticDeclination = magneticDeclination;
+                        }
                     }
                 },
                 (err) => {
@@ -115,8 +124,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 smoothedOrientation += diff * smoothingFactor;
                 smoothedOrientation = (smoothedOrientation + 360) % 360;
             }
-            deviceOrientation = smoothedOrientation;
+            // Apply magnetic declination to get True North heading
+            const trueHeading = smoothedOrientation + magneticDeclination;
+            deviceOrientation = (trueHeading + 360) % 360;
+
             diagnosticData.smoothedOrientation = smoothedOrientation;
+            diagnosticData.trueHeading = deviceOrientation;
 
             updateARView();
         };
