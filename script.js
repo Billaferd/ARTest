@@ -31,33 +31,6 @@ document.addEventListener('DOMContentLoaded', () => {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    // Center map on user's location
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (position) => {
-                const initialLocation = {
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude
-                };
-                map.setView(initialLocation, 16);
-                map.isUserLocationSet = true; // Flag to prevent re-centering in watchPosition
-                L.marker(initialLocation).addTo(map).bindPopup("You are here").openPopup();
-
-                // Calculate magnetic declination
-                if (typeof geomagnetism !== 'undefined') {
-                    const model = geomagnetism.model(new Date());
-                    const point = model.point([initialLocation.lat, initialLocation.lng]);
-                    magneticDeclination = point.decl;
-                }
-            },
-            () => {
-                const msg = "Could not get initial location. Using default view.";
-                console.log(msg);
-                logErrorToOverlay(msg);
-            },
-            { enableHighAccuracy: true }
-        );
-    }
 
     map.on('click', (e) => {
         targetLocation = e.latlng;
@@ -75,10 +48,12 @@ document.addEventListener('DOMContentLoaded', () => {
         cameraContainer.style.display = 'block';
         arMarker.style.display = 'block';
 
-        // Start camera and sensors
+        // No longer need to start sensors here, they start on page load
         startCamera();
-        startSensors();
     });
+
+    // Start sensors immediately on page load
+    startSensors();
 
     function startCamera() {
         if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -122,6 +97,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (!map.isUserLocationSet) {
                         map.setView(userLocation, 16);
                         map.isUserLocationSet = true;
+                        L.marker(userLocation).addTo(map).bindPopup("You are here").openPopup();
+
+                        // Calculate magnetic declination
+                        if (typeof geomagnetism !== 'undefined') {
+                            const model = geomagnetism.model(new Date());
+                            const point = model.point([userLocation.lat, userLocation.lng]);
+                            magneticDeclination = point.decl;
+                        }
                     }
                 },
                 (err) => {
