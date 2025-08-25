@@ -166,10 +166,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const filteredX = kfX.filter(x);
             const filteredY = kfY.filter(y);
 
-            // Convert the smoothed vector back to an angle
-            const smoothedHeadingRad = Math.atan2(filteredY, filteredX);
-            let smoothedHeading = smoothedHeadingRad * 180 / Math.PI;
-            smoothedHeading = (smoothedHeading + 360) % 360;
+            let smoothedHeading;
+            if (isNaN(filteredX) || isNaN(filteredY)) {
+                // If filter output is invalid, fall back to raw heading
+                smoothedHeading = heading;
+                logErrorToOverlay("Kalman filter returned NaN.");
+            } else {
+                // Convert the smoothed vector back to an angle
+                const smoothedHeadingRad = Math.atan2(filteredY, filteredX);
+                smoothedHeading = smoothedHeadingRad * 180 / Math.PI;
+                smoothedHeading = (smoothedHeading + 360) % 360;
+            }
 
             let finalHeading;
             if (gpsCalCheckbox.checked) {
