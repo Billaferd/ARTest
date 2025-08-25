@@ -19,7 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let orientationListener = null;
 
     function logErrorToOverlay(message) {
-        diagnosticsOverlay.innerHTML += `<br><span style="color: red;">ERROR: ${message}</span>`;
+        diagnosticsOverlay.innerHTML += `<br><span style="color: yellow;">DEBUG: ${message}</span>`;
     }
 
     map = L.map('map').setView([0, 0], 2);
@@ -93,7 +93,6 @@ document.addEventListener('DOMContentLoaded', () => {
             logErrorToOverlay("Geolocation not available.");
         }
 
-        // Default orientation handler using deviceorientation
         const handleOrientationEvent = (event) => {
             diagnosticData.rawHeading = event.alpha;
             diagnosticData.isAbsolute = event.absolute;
@@ -137,69 +136,59 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     advancedSensorBtn.addEventListener('click', () => {
+        logErrorToOverlay("Button clicked.");
         if ('AbsoluteOrientationSensor' in window) {
+            logErrorToOverlay("AbsoluteOrientationSensor is in window.");
             try {
-                // Remove the old listener
-                if (orientationListener) {
-                    window.removeEventListener('deviceorientation', orientationListener);
-                    orientationListener = null;
-                }
-
-                const kfX = new KalmanFilter();
-                const kfY = new KalmanFilter();
+                logErrorToOverlay("Entering try block.");
 
                 const sensor = new AbsoluteOrientationSensor({ frequency: 60 });
+                logErrorToOverlay("Sensor object created.");
 
-                const handleAdvancedOrientation = () => {
+                sensor.onreading = () => {
+                    logErrorToOverlay("onreading event fired.");
                     const q = sensor.quaternion;
                     diagnosticData.quaternion = q;
                     const yaw = Math.atan2(2 * (q[3] * q[2] + q[0] * q[1]), 1 - 2 * (q[1] * q[1] + q[2] * q[2]));
                     let heading = yaw * 180 / Math.PI;
                     if (heading < 0) heading += 360;
 
+                    // This part is now a simplified version, as we are replacing the main listener
                     diagnosticData.rawHeading = heading;
                     diagnosticData.isAbsolute = true;
                     if (compassStatus.innerHTML.indexOf('Advanced') === -1) {
                         compassStatus.textContent = 'Compass: Advanced';
                         compassStatus.style.color = 'cyan';
                     }
-
-                    const headingRad = heading * Math.PI / 180;
-                    const x = Math.cos(headingRad);
-                    const y = Math.sin(headingRad);
-
-                    const filteredX = kfX.filter(x);
-                    const filteredY = kfY.filter(y);
-
-                    let smoothedHeading;
-                    if (isNaN(filteredX) || isNaN(filteredY)) {
-                        smoothedHeading = heading;
-                    } else {
-                        const smoothedHeadingRad = Math.atan2(filteredY, filteredX);
-                        smoothedHeading = smoothedHeadingRad * 180 / Math.PI;
-                        smoothedHeading = (smoothedHeading + 360) % 360;
-                    }
-                    diagnosticData.magneticHeading = smoothedHeading;
-
-                    const trueHeading = smoothedHeading + magneticDeclination;
+                    const trueHeading = heading + magneticDeclination;
                     deviceOrientation = (trueHeading + 360) % 360;
                     diagnosticData.trueHeading = deviceOrientation;
-
                     updateARView();
                 };
+                logErrorToOverlay("onreading handler set.");
 
-                sensor.onreading = handleAdvancedOrientation;
                 sensor.onerror = (event) => {
-                    logErrorToOverlay(`Advanced Sensor Error: ${event.error.name}`);
+                    logErrorToOverlay(`onerror event fired: ${event.error.name}`);
                     advancedSensorBtn.disabled = true;
                     advancedSensorBtn.textContent = 'Advanced Sensor Failed';
                 };
+                logErrorToOverlay("onerror handler set.");
+
+                // Before starting, remove the old listener
+                if (orientationListener) {
+                    window.removeEventListener('deviceorientation', orientationListener);
+                    orientationListener = null;
+                    logErrorToOverlay("Old listener removed.");
+                }
+
                 sensor.start();
+                logErrorToOverlay("sensor.start() called.");
+
                 advancedSensorBtn.textContent = 'Advanced Sensor Active';
                 advancedSensorBtn.disabled = true;
 
             } catch (error) {
-                logErrorToOverlay(`Advanced Sensor Error: ${error.message}`);
+                logErrorToOverlay(`catch block entered: ${error.message}`);
                 advancedSensorBtn.disabled = true;
                 advancedSensorBtn.textContent = 'Advanced Sensor Failed';
             }
