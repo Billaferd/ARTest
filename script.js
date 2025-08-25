@@ -92,28 +92,47 @@ document.addEventListener('DOMContentLoaded', () => {
         let legacySensorReadingReceived = false;
 
         const handleNewHeading = (data, isAbsolute) => {
-            let heading;
+            let trueHeading; // This will be our final, True North heading.
+            let magneticHeadingForDiagnostics;
 
             if (isAbsolute) {
+                // The AbsoluteOrientationSensor provides orientation relative to True North.
+                // We do not need to apply magnetic declination.
                 if (!advancedSensorReadingReceived) {
                     logMessage('First advanced sensor reading received.');
                     advancedSensorReadingReceived = true;
                 }
-                // Data is a quaternion from AbsoluteOrientationSensor.
+
+                // 1. Convert quaternion to Euler angles
                 const euler = quaternionToEuler(data);
-                heading = euler.yaw * 180 / Math.PI;
-                heading = (heading + 360) % 360;
+
+                // 2. The yaw is counter-clockwise from the East axis. Convert to degrees.
+                const yawDegrees = euler.yaw * 180 / Math.PI;
+
+                // 3. Convert yaw to a compass heading (clockwise from North).
+                // Formula: heading = (450 - yawDegrees) % 360 or (90 - yawDegrees + 360) % 360
+                let compassHeading = (450 - yawDegrees) % 360;
+                trueHeading = compassHeading;
+
+                // For diagnostics, we can calculate what the magnetic heading would be.
+                magneticHeadingForDiagnostics = trueHeading - magneticDeclination;
+
+                diagnosticData.rawHeading = yawDegrees.toFixed(2); // Log the raw yaw for debugging
 
             } else {
+                // The legacy deviceorientation event provides a magnetic heading.
+                // We MUST apply magnetic declination to get True North.
                 if (!legacySensorReadingReceived) {
                     logMessage('First legacy sensor reading received.');
                     legacySensorReadingReceived = true;
                 }
-                // Data is a heading number from legacy events.
-                heading = data;
+                const magneticHeading = data; // This is event.alpha from the legacy sensor
+                trueHeading = magneticHeading + magneticDeclination;
+                magneticHeadingForDiagnostics = magneticHeading;
+
+                diagnosticData.rawHeading = magneticHeading.toFixed(2);
             }
 
-            diagnosticData.rawHeading = heading.toFixed(2);
             diagnosticData.isAbsolute = isAbsolute;
 
             const compassType = isAbsolute ? 'Advanced' : 'Legacy';
@@ -121,33 +140,29 @@ document.addEventListener('DOMContentLoaded', () => {
             compassStatus.textContent = `Compass: ${compassType} (${headingType})`;
             compassStatus.style.color = isAbsolute ? 'cyan' : 'orange';
 
+            // Kalman filter should be applied to the most consistent value before final corrections.
+            // Applying to trueHeading here.
             let smoothedHeading;
             if (isFilterAvailable) {
-                const headingRad = heading * Math.PI / 180;
+                // Kalman filter works better on Cartesian coordinates
+                const headingRad = trueHeading * Math.PI / 180;
                 const x = Math.cos(headingRad);
                 const y = Math.sin(headingRad);
                 const filteredX = kfX.filter(x);
                 const filteredY = kfY.filter(y);
-
-                if (isNaN(filteredX) || isNaN(filteredY)) {
-                    smoothedHeading = heading;
-                } else {
-                    const smoothedHeadingRad = Math.atan2(filteredY, filteredX);
-                    smoothedHeading = smoothedHeadingRad * 180 / Math.PI;
-                    smoothedHeading = (smoothedHeading + 360) % 360;
-                }
+                const smoothedHeadingRad = Math.atan2(filteredY, filteredX);
+                smoothedHeading = (smoothedHeadingRad * 180 / Math.PI + 360) % 360;
             } else {
-                smoothedHeading = heading;
+                smoothedHeading = trueHeading;
             }
 
-            diagnosticData.magneticHeading = smoothedHeading.toFixed(2);
 
-            const finalHeading = smoothedHeading + magneticDeclination;
-            diagnosticData.trueHeading = ((finalHeading + 360) % 360).toFixed(2);
+            diagnosticData.magneticHeading = (magneticHeadingForDiagnostics).toFixed(2);
+            diagnosticData.trueHeading = smoothedHeading.toFixed(2);
 
-            // *** NEW: Correct for screen orientation ***
+            // Correct for screen orientation
             const screenOrientationAngle = screen.orientation.angle || 0;
-            deviceOrientation = (finalHeading - screenOrientationAngle + 360) % 360;
+            deviceOrientation = (smoothedHeading - screenOrientationAngle + 360) % 360;
             diagnosticData.screenCorrectedHeading = deviceOrientation.toFixed(2);
 
 
