@@ -146,9 +146,13 @@ document.addEventListener('DOMContentLoaded', () => {
                     compassStatus.textContent = 'Compass: Advanced';
                     compassStatus.style.color = 'cyan';
                     const q = sensor.quaternion;
+                    // The math for converting quaternion to yaw/heading is correct,
+                    // but the direction seems to be inverted based on clues from
+                    // polyfill implementations (e.g., 360 - webkitCompassHeading).
                     const yaw = Math.atan2(2 * (q[3] * q[2] + q[0] * q[1]), 1 - 2 * (q[1] * q[1] + q[2] * q[2]));
                     let heading = yaw * 180 / Math.PI;
-                    if (heading < 0) heading += 360;
+                    heading = 360 - heading; // Invert heading
+                    heading = (heading + 360) % 360; // Normalize to 0-360
                     handleNewHeading(heading, true);
                 };
                 sensor.onerror = (event) => {
