@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const instructions = document.getElementById('instructions');
     const diagnosticsOverlay = document.getElementById('diagnostics');
     const compassStatus = document.getElementById('compass-status');
+    const kalmanFilterBtn = document.getElementById('kalman-filter-btn');
 
     let map;
     let userLocation;
@@ -15,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let magneticDeclination = 0;
 
     let diagnosticData = {};
+    let orientationListener = null;
 
     function logErrorToOverlay(message) {
         diagnosticsOverlay.innerHTML += `<br><span style="color: red;">ERROR: ${message}</span>`;
@@ -91,7 +93,8 @@ document.addEventListener('DOMContentLoaded', () => {
             logErrorToOverlay("Geolocation not available.");
         }
 
-        const handleOrientation = (event) => {
+        // Default orientation handler using deviceorientation
+        const handleOrientationEvent = (event) => {
             diagnosticData.rawHeading = event.alpha;
             diagnosticData.isAbsolute = event.absolute;
 
@@ -129,14 +132,74 @@ document.addEventListener('DOMContentLoaded', () => {
             updateARView();
         };
 
-        if (typeof window.DeviceOrientationAbsoluteEvent !== 'undefined') {
-            window.addEventListener('deviceorientationabsolute', handleOrientation);
-        } else if (window.DeviceOrientationEvent) {
-            window.addEventListener('deviceorientation', handleOrientation);
-        } else {
-            logErrorToOverlay("Device orientation not available.");
-        }
+        orientationListener = handleOrientationEvent;
+        window.addEventListener('deviceorientation', orientationListener);
     }
+
+    kalmanFilterBtn.addEventListener('click', () => {
+        if (typeof KalmanFilter === 'undefined') {
+            logErrorToOverlay('KalmanFilter library not loaded.');
+            kalmanFilterBtn.disabled = true;
+            return;
+        }
+
+        // Remove the old listener
+        if (orientationListener) {
+            window.removeEventListener('deviceorientation', orientationListener);
+            orientationListener = null;
+        }
+
+        const kfX = new KalmanFilter();
+        const kfY = new KalmanFilter();
+
+        const handleKalmanOrientation = (event) => {
+            let heading = event.alpha;
+            if (typeof event.webkitCompassHeading !== 'undefined') {
+                heading = event.webkitCompassHeading;
+            }
+            diagnosticData.rawHeading = heading;
+            diagnosticData.isAbsolute = event.absolute;
+
+            if (compassStatus.innerHTML.indexOf('Kalman') === -1) {
+                compassStatus.textContent = 'Compass: Kalman';
+                compassStatus.style.color = 'cyan';
+            }
+
+            const headingRad = heading * Math.PI / 180;
+            const x = Math.cos(headingRad);
+            const y = Math.sin(headingRad);
+
+            const filteredX = kfX.filter(x);
+            const filteredY = kfY.filter(y);
+
+            let smoothedHeading;
+            if (isNaN(filteredX) || isNaN(filteredY)) {
+                smoothedHeading = heading;
+            } else {
+                const smoothedHeadingRad = Math.atan2(filteredY, filteredX);
+                smoothedHeading = smoothedHeadingRad * 180 / Math.PI;
+                smoothedHeading = (smoothedHeading + 360) % 360;
+            }
+            diagnosticData.magneticHeading = smoothedHeading;
+
+            const trueHeading = smoothedHeading + magneticDeclination;
+            deviceOrientation = (trueHeading + 360) % 360;
+            diagnosticData.trueHeading = deviceOrientation;
+
+            updateARView();
+        };
+
+        orientationListener = handleKalmanOrientation;
+        // The modern sensor is still not trusted, so we use the legacy one
+        if (typeof window.DeviceOrientationAbsoluteEvent !== 'undefined') {
+            window.addEventListener('deviceorientationabsolute', orientationListener);
+        } else {
+            window.addEventListener('deviceorientation', orientationListener);
+        }
+
+        kalmanFilterBtn.textContent = 'Kalman Filter Active';
+        kalmanFilterBtn.disabled = true;
+    });
 
     function updateDiagnostics(data) {
         let content = '--- Diagnostics ---<br>';
