@@ -105,8 +105,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 const q = data;
                 const yaw = Math.atan2(2 * (q[3] * q[2] + q[0] * q[1]), 1 - 2 * (q[1] * q[1] + q[2] * q[2]));
                 heading = yaw * 180 / Math.PI;
-                // Based on testing and polyfill examples, the heading from the formula is inverted.
-                heading = 360 - heading;
                 heading = (heading + 360) % 360;
             } else {
                 if (!legacySensorReadingReceived) {
