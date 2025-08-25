@@ -1,6 +1,18 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const map = L.map('map').setView([0, 0], 2);
+    const mapElement = document.getElementById('map');
+    const cameraContainer = document.getElementById('camera-container');
+    const cameraFeed = document.getElementById('camera-feed');
+    const arMarker = document.getElementById('ar-marker');
+    const instructions = document.getElementById('instructions');
+    const diagnosticsOverlay = document.getElementById('diagnostics');
+    const compassStatus = document.getElementById('compass-status');
+
+    let map;
+    let userLocation;
+    let targetLocation;
     let isMapCentered = false;
+
+    map = L.map('map').setView([0, 0], 2);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -9,7 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (navigator.geolocation) {
         navigator.geolocation.watchPosition(
             (position) => {
-                const userLocation = {
+                userLocation = {
                     lat: position.coords.latitude,
                     lng: position.coords.longitude
                 };
@@ -20,16 +32,40 @@ document.addEventListener('DOMContentLoaded', () => {
                     isMapCentered = true;
                 }
             },
-            (err) => {
-                // Can't show an error overlay as it's not in the HTML yet.
-                // We'll just log to console for now.
-                console.error(`ERROR(${err.code}): ${err.message}`);
-            },
-            {
-                enableHighAccuracy: true
-            }
+            (err) => { console.error("Geolocation Error"); },
+            { enableHighAccuracy: true }
         );
-    } else {
-        console.error("Geolocation is not supported by this browser.");
+    }
+
+    map.on('click', (e) => {
+        targetLocation = e.latlng;
+        instructions.innerHTML = `<p>Target selected. Look around to find it!</p>`;
+
+        if (window.targetMarker) {
+            window.targetMarker.setLatLng(targetLocation);
+        } else {
+            window.targetMarker = L.marker(targetLocation).addTo(map);
+        }
+
+        mapElement.style.display = 'none';
+        cameraContainer.style.display = 'block';
+        arMarker.style.display = 'block';
+
+        startCamera();
+    });
+
+    function startCamera() {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+                .then(stream => {
+                    cameraFeed.srcObject = stream;
+                    cameraFeed.play();
+                })
+                .catch(err => {
+                    console.error("Camera Error");
+                });
+        } else {
+            console.error("Camera not available.");
+        }
     }
 });
