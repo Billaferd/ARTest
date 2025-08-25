@@ -14,9 +14,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let magneticDeclination = 0;
 
     let diagnosticData = {};
+    let logMessages = [];
 
-    function logErrorToOverlay(message) {
-        diagnosticsOverlay.innerHTML += `<br><span style="color: red;">ERROR: ${message}</span>`;
+    function logMessage(message, isError = false) {
+        const color = isError ? 'red' : 'white';
+        const prefix = isError ? 'ERROR: ' : 'INFO: ';
+        logMessages.push(`<span style="color: ${color};">${prefix}${message}</span>`);
     }
 
     map = L.map('map').setView([0, 0], 2);
@@ -25,7 +28,6 @@ document.addEventListener('DOMContentLoaded', () => {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     }).addTo(map);
 
-    // Get initial location to center map
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition((position) => {
             const initialLocation = { lat: position.coords.latitude, lng: position.coords.longitude };
@@ -50,7 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
         arMarker.style.display = 'block';
 
         startCamera();
-        startSensors(); // Sensors are now started on click
+        startSensors();
     });
 
     function startCamera() {
@@ -61,23 +63,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     cameraFeed.play();
                 })
                 .catch(err => {
-                    logErrorToOverlay("Could not access camera.");
+                    logMessage("Could not access camera.", true);
                 });
         } else {
-            logErrorToOverlay("Camera not available.");
+            logMessage("Camera not available.", true);
         }
     }
 
     function startSensors() {
-        logErrorToOverlay('Starting sensor initialization...');
+        logMessage('Starting sensor initialization...');
         let kfX, kfY;
 
         try {
             kfX = new KalmanFilter();
             kfY = new KalmanFilter();
-            logErrorToOverlay('Kalman filters initialized successfully.');
+            logMessage('Kalman filters initialized successfully.');
         } catch (e) {
-            logErrorToOverlay(`CRITICAL: Failed to initialize KalmanFilter. Error: ${e.message}. The application cannot proceed.`);
+            logMessage(`CRITICAL: Failed to initialize KalmanFilter. Error: ${e.message}.`, true);
             return;
         }
 
@@ -89,21 +91,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (isAbsolute) {
                 if (!advancedSensorReadingReceived) {
-                    logErrorToOverlay('First advanced sensor reading received.');
+                    logMessage('First advanced sensor reading received.');
                     advancedSensorReadingReceived = true;
                 }
-                // Data is a quaternion from AbsoluteOrientationSensor
                 const q = data;
                 const yaw = Math.atan2(2 * (q[3] * q[2] + q[0] * q[1]), 1 - 2 * (q[1] * q[1] + q[2] * q[2]));
                 heading = yaw * 180 / Math.PI;
-                heading = 360 - heading; // Invert as per previous findings
+                heading = 360 - heading;
                 heading = (heading + 360) % 360;
             } else {
                 if (!legacySensorReadingReceived) {
-                    logErrorToOverlay('First legacy sensor reading received.');
+                    logMessage('First legacy sensor reading received.');
                     legacySensorReadingReceived = true;
                 }
-                // Data is a heading number from legacy events
                 heading = data;
             }
 
@@ -135,28 +135,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 smoothedHeading = smoothedHeadingRad * 180 / Math.PI;
                 smoothedHeading = (smoothedHeading + 360) % 360;
             }
-            diagnosticData.magneticHeading = smoothedHeading;
+            diagnosticData.magneticHeading = smoothedHeading.toFixed(2);
 
             const finalHeading = smoothedHeading + magneticDeclination;
             deviceOrientation = (finalHeading + 360) % 360;
-            diagnosticData.trueHeading = deviceOrientation;
+            diagnosticData.trueHeading = deviceOrientation.toFixed(2);
 
             updateARView();
         };
 
         const setupLegacyListener = () => {
-            logErrorToOverlay('Setting up legacy sensor listener...');
+            logMessage('Setting up legacy sensor listener...');
             const handleOrientationEvent = (event) => {
                 if (typeof event.webkitCompassHeading !== 'undefined') {
-                    handleNewHeading(event.webkitCompassHeading, false); // Assuming legacy is not absolute unless specified
+                    handleNewHeading(event.webkitCompassHeading, false);
                     return;
                 }
                 if (event.absolute === true) {
                     handleNewHeading(event.alpha, false);
                 } else {
                     const message = "Compass is relative, which is not supported.";
-                    if (!diagnosticsOverlay.innerHTML.includes(message)) {
-                        logErrorToOverlay(message);
+                    if (logMessages.every(m => !m.includes(message))) {
+                        logMessage(message, true);
                         compassStatus.textContent = 'Compass: Relative (unsupported)';
                         compassStatus.style.color = 'red';
                     }
@@ -164,54 +164,54 @@ document.addEventListener('DOMContentLoaded', () => {
             };
 
             if (typeof window.DeviceOrientationAbsoluteEvent !== 'undefined') {
-                logErrorToOverlay('Listening for deviceorientationabsolute events.');
+                logMessage('Listening for deviceorientationabsolute events.');
                 window.addEventListener('deviceorientationabsolute', handleOrientationEvent);
             } else if (window.DeviceOrientationEvent) {
-                logErrorToOverlay('Listening for deviceorientation events.');
+                logMessage('Listening for deviceorientation events.');
                 window.addEventListener('deviceorientation', handleOrientationEvent);
             } else {
-                logErrorToOverlay("Device orientation events not available.");
+                logMessage("Device orientation events not available.", true);
             }
         };
 
         const startAdvancedSensor = () => {
-            logErrorToOverlay('Attempting to start AbsoluteOrientationSensor...');
+            logMessage('Attempting to start AbsoluteOrientationSensor...');
             try {
                 const sensor = new AbsoluteOrientationSensor({ frequency: 60 });
-                logErrorToOverlay('Successfully created AbsoluteOrientationSensor object.');
+                logMessage('Successfully created AbsoluteOrientationSensor object.');
 
                 sensor.onreading = () => {
                     handleNewHeading(sensor.quaternion, true);
                 };
 
                 sensor.onerror = (event) => {
-                    logErrorToOverlay(`Advanced Sensor Error: ${event.error.name}. Falling back to legacy listener.`);
+                    logMessage(`Advanced Sensor Error: ${event.error.name}. Falling back to legacy listener.`, true);
                     setupLegacyListener();
                 };
 
                 sensor.start();
-                logErrorToOverlay('sensor.start() called on advanced sensor.');
+                logMessage('sensor.start() called on advanced sensor.');
 
             } catch (error) {
-                logErrorToOverlay(`Failed to start advanced sensor: ${error.message}. Falling back to legacy listener.`);
+                logMessage(`Failed to start advanced sensor: ${error.message}. Falling back to legacy listener.`, true);
                 setupLegacyListener();
             }
         };
 
         if ('AbsoluteOrientationSensor' in window) {
-            logErrorToOverlay('AbsoluteOrientationSensor API is available.');
+            logMessage('AbsoluteOrientationSensor API is available.');
             startAdvancedSensor();
         } else {
-            logErrorToOverlay('AbsoluteOrientationSensor API not available.');
+            logMessage('AbsoluteOrientationSensor API not available.');
             setupLegacyListener();
         }
 
         if (navigator.geolocation) {
-            logErrorToOverlay('Geolocation API is available. Watching position...');
+            logMessage('Geolocation API is available. Watching position...');
             navigator.geolocation.watchPosition(
                 (position) => {
                     if (!userLocation) {
-                        logErrorToOverlay('Received first geolocation update.');
+                        logMessage('Received first geolocation update.');
                     }
                     userLocation = {
                         lat: position.coords.latitude,
@@ -221,25 +221,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (!map.isUserLocationSet) {
                         map.isUserLocationSet = true;
-                        logErrorToOverlay('Calculating magnetic declination...');
+                        logMessage('Calculating magnetic declination...');
                         if (typeof geomagnetism !== 'undefined') {
                             const model = geomagnetism.model(new Date());
                             const point = model.point([userLocation.lat, userLocation.lng]);
                             magneticDeclination = point.decl;
-                            diagnosticData.magneticDeclination = magneticDeclination;
-                            logErrorToOverlay(`Magnetic declination set to: ${magneticDeclination.toFixed(2)}`);
+                            diagnosticData.magneticDeclination = magneticDeclination.toFixed(2);
+                            logMessage(`Magnetic declination set to: ${magneticDeclination.toFixed(2)}`);
                         } else {
-                            logErrorToOverlay('Geomagnetism library not available.');
+                            logMessage('Geomagnetism library not available.', true);
                         }
                     }
                 },
                 (err) => {
-                    logErrorToOverlay(`Could not get location: ${err.message}`);
+                    logMessage(`Could not get location: ${err.message}`, true);
                 },
                 { enableHighAccuracy: true }
             );
         } else {
-            logErrorToOverlay("Geolocation API not available.");
+            logMessage("Geolocation API not available.", true);
         }
     }
 
@@ -250,10 +250,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (value === undefined) {
                 displayValue = '...';
             } else if (typeof value === 'object' && value !== null) {
-                displayValue = JSON.stringify(value, null, 2);
+                displayValue = JSON.stringify(value, (k, v) => (v && v.toFixed) ? Number(v.toFixed(2)) : v, 2);
             }
             content += `${key}: ${displayValue}<br>`;
         }
+        content += '<br>--- Logs ---<br>';
+        content += logMessages.join('<br>');
         diagnosticsOverlay.innerHTML = content;
     }
 
