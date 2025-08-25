@@ -8,7 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const compassStatus = document.getElementById('compass-status');
     const gpsCalCheckbox = document.getElementById('gps-cal-checkbox');
 
-    const GPS_BUFFER_SIZE = 100;
+    const GPS_BUFFER_SIZE = 1000;
     let gpsLocationBuffer = [];
 
     let map;
@@ -142,9 +142,11 @@ document.addEventListener('DOMContentLoaded', () => {
             diagnosticData.magneticHeading = smoothedHeading;
 
             let finalHeading;
-            if (gpsCalCheckbox.checked) {
+            if (gpsCalCheckbox.checked && !diagnosticData.isAbsolute) {
+                // Apply GPS calibration offset only if compass is relative
                 finalHeading = heading + gpsCalibrationOffset;
             } else {
+                // Apply magnetic declination to get True North heading
                 finalHeading = smoothedHeading + magneticDeclination;
             }
             deviceOrientation = (finalHeading + 360) % 360;
