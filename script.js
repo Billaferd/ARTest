@@ -227,7 +227,9 @@ document.addEventListener('DOMContentLoaded', () => {
                         map.isUserLocationSet = true;
                         logMessage('Calculating magnetic declination...');
                         if (typeof geomagnetism !== 'undefined') {
-                            const model = geomagnetism.model(new Date());
+                            // Handle UMD module loading where the main export might be on the .default property.
+                            const geo = geomagnetism.default || geomagnetism;
+                            const model = geo.model(new Date());
                             const point = model.point([userLocation.lat, userLocation.lng]);
                             magneticDeclination = point.decl;
                             isDeclinationAvailable = true;
