@@ -1,5 +1,108 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const mapElement = document.getElementById('map');
+// Helper functions for calculations (exported for testing)
+
+/**
+ * Calculates the distance between two GPS coordinates in kilometers.
+ * Uses the Haversine formula.
+ * @param {object} start - The starting coordinate {lat, lng}.
+ * @param {object} end - The ending coordinate {lat, lng}.
+ * @returns {number} The distance in kilometers.
+ */
+function calculateDistance(start, end) {
+    const R = 6371; // Earth's radius in kilometers
+    const toRadians = Math.PI / 180;
+    const dLat = (end.lat - start.lat) * toRadians;
+    const dLon = (end.lng - start.lng) * toRadians;
+    const lat1 = start.lat * toRadians;
+    const lat2 = end.lat * toRadians;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+/**
+ * Calculates the initial bearing (forward azimuth) from one GPS coordinate to another.
+ * @param {object} start - The starting coordinate {lat, lng}.
+ * @param {object} end - The ending coordinate {lat, lng}.
+ * @returns {number} The bearing in degrees (0-360).
+ */
+function calculateBearing(start, end) {
+    const toRadians = Math.PI / 180;
+    const toDegrees = 180 / Math.PI;
+    const lat1 = start.lat * toRadians;
+    const lng1 = start.lng * toRadians;
+    const lat2 = end.lat * toRadians;
+    const lng2 = end.lng * toRadians;
+    const y = Math.sin(lng2 - lng1) * Math.cos(lat2);
+    const x = Math.cos(lat1) * Math.sin(lat2) -
+              Math.sin(lat1) * Math.cos(lat2) * Math.cos(lng2 - lng1);
+    const bearing = Math.atan2(y, x) * toDegrees;
+    return (bearing + 360) % 360;
+}
+
+/**
+ * Converts a quaternion to Euler angles (yaw, pitch, roll).
+ * @param {number[]} q - The quaternion as an array [x, y, z, w].
+ * @returns {object} An object with { yaw, pitch, roll } in radians.
+ */
+function quaternionToEuler(q) {
+    const [x, y, z, w] = q;
+
+    // roll (x-axis rotation)
+    const sinr_cosp = 2 * (w * x + y * z);
+    const cosr_cosp = 1 - 2 * (x * x + y * y);
+    const roll = Math.atan2(sinr_cosp, cosr_cosp);
+
+    // pitch (y-axis rotation)
+    const sinp = 2 * (w * y - z * x);
+    let pitch;
+    if (Math.abs(sinp) >= 1) {
+        pitch = Math.sign(sinp) * Math.PI / 2; // use 90 degrees if out of range
+    } else {
+        pitch = Math.asin(sinp);
+    }
+
+    // yaw (z-axis rotation)
+    const siny_cosp = 2 * (w * z + x * y);
+    const cosy_cosp = 1 - 2 * (y * y + z * z);
+    const yaw = Math.atan2(siny_cosp, cosy_cosp);
+
+    return { yaw, pitch, roll };
+}
+
+/**
+ * Converts a target's geographic coordinates to a 3D vector relative to the user.
+ * @param {object} userLoc - The user's location {lat, lng}.
+ * @param {object} targetLoc - The target's location {lat, lng}.
+ * @param {number} userElev - The user's elevation in meters.
+ * @param {number} targetElev - The target's elevation in meters.
+ * @returns {object} The 3D position vector for the scene, compatible with BABYLON.Vector3.
+ */
+function getTargetPositionInScene(userLoc, targetLoc, userElev, targetElev) {
+    const distance = calculateDistance(userLoc, targetLoc) * 1000; // convert km to meters
+    const bearing = calculateBearing(userLoc, targetLoc);
+    const bearingRad = bearing * (Math.PI / 180);
+
+    // Y is the elevation difference (Up/Down in the scene)
+    const y = targetElev - userElev;
+
+    // X is the East/West component
+    const x = distance * Math.sin(bearingRad);
+
+    // Z is the North/South component.
+    // We negate Z because the Babylon.js camera looks down the -Z axis by default.
+    // This aligns our scene's coordinate system (North = -Z) with the camera's.
+    const z = -distance * Math.cos(bearingRad);
+
+    // Returning a plain object for testability, can be converted to BABYLON.Vector3 later
+    return { x, y, z };
+}
+
+
+// Main application logic - only run in a browser
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        const mapElement = document.getElementById('map');
     const cameraContainer = document.getElementById('camera-container');
     const cameraFeed = document.getElementById('camera-feed');
     const instructions = document.getElementById('instructions');
@@ -112,16 +215,22 @@ document.addEventListener('DOMContentLoaded', () => {
                     advancedSensorReadingReceived = true;
                 }
 
-                // 1. Convert quaternion to Euler angles
-                const euler = quaternionToEuler(event); // event is sensor.quaternion
-                const yawDegrees = euler.yaw * 180 / Math.PI;
-                pitch = euler.pitch * 180 / Math.PI;
+                // 1. Convert quaternion to Euler angles.
+                // Note on axis conventions:
+                // - The AbsoluteOrientationSensor provides orientation relative to a standard East-North-Up coordinate system.
+                // - Our quaternionToEuler function calculates angles based on a ZYX rotation order.
+                // - In this context:
+                //   - Rotation around Y-axis (vertical) is `euler.pitch`, which we use for the compass heading.
+                //   - Rotation around X-axis (forward/backward tilt) is `euler.roll`, which we use for the device pitch.
+                const euler = quaternionToEuler(event);
+                const compassHeadingDegrees = euler.pitch * (180 / Math.PI);
+                pitch = euler.roll * (180 / Math.PI); // This is the device's forward/backward tilt.
 
-                // 2. Convert yaw to a compass heading (clockwise from North).
-                let compassHeading = (360 - yawDegrees) % 360;
+                // 2. Convert the counter-clockwise angle to a clockwise compass bearing.
+                let compassHeading = (360 - compassHeadingDegrees) % 360;
                 trueHeading = compassHeading;
                 magneticHeadingForDiagnostics = trueHeading - magneticDeclination;
-                diagnosticData.rawHeading = yawDegrees.toFixed(2);
+                diagnosticData.rawHeading = compassHeadingDegrees.toFixed(2);
 
             } else {
                 // The legacy deviceorientation event provides a magnetic heading.
@@ -303,13 +412,14 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Get the target's position in the 3D scene relative to the user
-            const targetPosition = getTargetPositionInScene(userLocation, targetLocation, userElevation, targetElevation);
-            lightPillar.position = targetPosition;
+            const pos = getTargetPositionInScene(userLocation, targetLocation, userElevation, targetElevation);
+            lightPillar.position = new BABYLON.Vector3(pos.x, pos.y, pos.z);
+
 
             diagnosticData.targetPosition3D = {
-                x: targetPosition.x.toFixed(2),
-                y: targetPosition.y.toFixed(2),
-                z: targetPosition.z.toFixed(2)
+                x: pos.x.toFixed(2),
+                y: pos.y.toFixed(2),
+                z: pos.z.toFixed(2)
             };
         }
 
@@ -407,73 +517,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    /**
-     * Calculates the distance between two GPS coordinates in kilometers.
-     * Uses the Haversine formula.
-     * @param {object} start - The starting coordinate {lat, lng}.
-     * @param {object} end - The ending coordinate {lat, lng}.
-     * @returns {number} The distance in kilometers.
-     */
-    function calculateDistance(start, end) {
-        const R = 6371; // Earth's radius in kilometers
-        const toRadians = Math.PI / 180;
-        const dLat = (end.lat - start.lat) * toRadians;
-        const dLon = (end.lng - start.lng) * toRadians;
-        const lat1 = start.lat * toRadians;
-        const lat2 = end.lat * toRadians;
-        const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-                  Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return R * c;
-    }
-
-    /**
-     * Calculates the initial bearing (forward azimuth) from one GPS coordinate to another.
-     * @param {object} start - The starting coordinate {lat, lng}.
-     * @param {object} end - The ending coordinate {lat, lng}.
-     * @returns {number} The bearing in degrees (0-360).
-     */
-    function calculateBearing(start, end) {
-        const toRadians = Math.PI / 180;
-        const toDegrees = 180 / Math.PI;
-        const lat1 = start.lat * toRadians;
-        const lng1 = start.lng * toRadians;
-        const lat2 = end.lat * toRadians;
-        const lng2 = end.lng * toRadians;
-        const y = Math.sin(lng2 - lng1) * Math.cos(lat2);
-        const x = Math.cos(lat1) * Math.sin(lat2) -
-                  Math.sin(lat1) * Math.cos(lat2) * Math.cos(lng2 - lng1);
-        const bearing = Math.atan2(y, x) * toDegrees;
-        return (bearing + 360) % 360;
-    }
-
-    /**
-     * Converts a target's geographic coordinates to a 3D vector relative to the user.
-     * @param {object} userLoc - The user's location {lat, lng}.
-     * @param {object} targetLoc - The target's location {lat, lng}.
-     * @param {number} userElev - The user's elevation in meters.
-     * @param {number} targetElev - The target's elevation in meters.
-     * @returns {BABYLON.Vector3} The 3D position vector for the scene.
-     */
-    function getTargetPositionInScene(userLoc, targetLoc, userElev, targetElev) {
-        const distance = calculateDistance(userLoc, targetLoc) * 1000; // convert km to meters
-        const bearing = calculateBearing(userLoc, targetLoc);
-        const bearingRad = bearing * (Math.PI / 180);
-
-        // Y is the elevation difference (Up/Down in the scene)
-        const y = targetElev - userElev;
-
-        // X is the East/West component
-        const x = distance * Math.sin(bearingRad);
-
-        // Z is the North/South component.
-        // We negate Z because the Babylon.js camera looks down the -Z axis by default.
-        // This aligns our scene's coordinate system (North = -Z) with the camera's.
-        const z = -distance * Math.cos(bearingRad);
-
-        return new BABYLON.Vector3(x, y, z);
-    }
-
     function initBabylonScene() {
         const canvas = document.getElementById('renderCanvas');
         engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
@@ -518,30 +561,16 @@ document.addEventListener('DOMContentLoaded', () => {
         logMessage('Babylon.js scene initialized.');
     }
 
-    function quaternionToEuler(q) {
-        const [x, y, z, w] = q;
-
-        // roll (x-axis rotation)
-        const sinr_cosp = 2 * (w * x + y * z);
-        const cosr_cosp = 1 - 2 * (x * x + y * y);
-        const roll = Math.atan2(sinr_cosp, cosr_cosp);
-
-        // pitch (y-axis rotation)
-        const sinp = 2 * (w * y - z * x);
-        let pitch;
-        if (Math.abs(sinp) >= 1) {
-            pitch = Math.sign(sinp) * Math.PI / 2; // use 90 degrees if out of range
-        } else {
-            pitch = Math.asin(sinp);
-        }
-
-        // yaw (z-axis rotation)
-        const siny_cosp = 2 * (w * z + x * y);
-        const cosy_cosp = 1 - 2 * (y * y + z * z);
-        const yaw = Math.atan2(siny_cosp, cosy_cosp);
-
-        return { yaw, pitch, roll };
-    }
-
     setInterval(() => updateDiagnostics(diagnosticData), 250);
-});
+    });
+}
+
+// Export functions for testing if in a Node.js-like environment
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        calculateDistance,
+        calculateBearing,
+        quaternionToEuler,
+        getTargetPositionInScene
+    };
+}
