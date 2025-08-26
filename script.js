@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const instructions = document.getElementById('instructions');
     const diagnosticsOverlay = document.getElementById('diagnostics');
     const compassStatus = document.getElementById('compass-status');
+    const arrowContainer = document.getElementById('arrow-container');
 
     let map;
     let userLocation, userElevation;
@@ -330,6 +331,60 @@ document.addEventListener('DOMContentLoaded', () => {
         diagnosticData.distance = (distance / 1000).toFixed(2) + ' km';
         const bearing = calculateBearing(userLocation, targetLocation);
         diagnosticData.bearing = bearing.toFixed(2);
+
+        // --- Arrow Indicator Logic ---
+        if (lightPillar && arCamera) {
+            const frustumPlanes = BABYLON.Frustum.GetPlanes(scene.getTransformMatrix());
+            const isVisible = lightPillar.isInFrustum(frustumPlanes);
+
+            if (!isVisible) {
+                // Target is NOT in view
+                arrowContainer.style.display = 'flex'; // Show arrow
+                cameraContainer.classList.remove('target-in-view');
+
+                const targetVector = lightPillar.getAbsolutePosition();
+
+                // Check if the target is behind the camera.
+                const cameraDirection = arCamera.getForwardRay().direction;
+                const toTarget = targetVector.subtract(arCamera.position);
+                const dotProduct = BABYLON.Vector3.Dot(cameraDirection, toTarget);
+                const isBehind = dotProduct < 0;
+
+                // Project the target's 3D position onto the 2D screen
+                const screenPoint = BABYLON.Vector3.Project(
+                    targetVector,
+                    BABYLON.Matrix.Identity(),
+                    scene.getTransformMatrix(),
+                    arCamera.viewport.toGlobal(engine.getRenderWidth(), engine.getRenderHeight())
+                );
+
+                let angleDeg;
+
+                if (isBehind) {
+                    // If the target is behind, project the point from the opposite side of the screen center
+                    const centerX = window.innerWidth / 2;
+                    const centerY = window.innerHeight / 2;
+                    const oppositeX = centerX + (centerX - screenPoint.x);
+                    const oppositeY = centerY + (centerY - screenPoint.y);
+                    const angleRad = Math.atan2(oppositeY - centerY, oppositeX - centerX);
+                    angleDeg = angleRad * 180 / Math.PI + 90;
+                } else {
+                    // Standard angle calculation for when the target is off-screen but in front.
+                    const centerX = window.innerWidth / 2;
+                    const centerY = window.innerHeight / 2;
+                    const angleRad = Math.atan2(screenPoint.y - centerY, screenPoint.x - centerX);
+                    angleDeg = angleRad * 180 / Math.PI + 90; // +90 to correct for arrow's default orientation
+                }
+
+                // Apply the rotation to the arrow
+                arrowContainer.style.transform = `translate(-50%, -50%) rotate(${angleDeg}deg)`;
+
+            } else {
+                // Target IS in view
+                arrowContainer.style.display = 'none'; // Hide arrow
+                cameraContainer.classList.add('target-in-view');
+            }
+        }
     }
 
     async function getElevation(lat, lng) {
