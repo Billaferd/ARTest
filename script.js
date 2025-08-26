@@ -109,6 +109,11 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
     const diagnosticsOverlay = document.getElementById('diagnostics');
     const compassStatus = document.getElementById('compass-status');
     const arrowContainer = document.getElementById('arrow-container');
+    const toggleDiagnosticsBtn = document.getElementById('toggle-diagnostics-btn');
+
+    toggleDiagnosticsBtn.addEventListener('click', () => {
+        diagnosticsOverlay.classList.toggle('hidden');
+    });
 
     let map;
     let userLocation, userElevation;
