@@ -1,4 +1,3 @@
-import * as BABYLON from 'babylonjs';
 import { getTargetPositionInScene, calculateDistance, calculateBearing } from './utils.js';
 import { logMessage } from './ui-controller.js';
 
