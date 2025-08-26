@@ -8,9 +8,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const compassStatus = document.getElementById('compass-status');
 
     let map;
-    let userLocation;
-    let targetLocation;
-    let deviceOrientation;
+    let userLocation, userElevation;
+    let targetLocation, targetElevation;
+    let deviceOrientation, devicePitch;
     let magneticDeclination = 0;
     let isDeclinationAvailable = false;
 
@@ -40,9 +40,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }, null, { enableHighAccuracy: true });
     }
 
-    map.on('click', (e) => {
+    map.on('click', async (e) => {
         targetLocation = e.latlng;
-        diagnosticData.targetLocation = targetLocation;
+        targetElevation = await getElevation(targetLocation.lat, targetLocation.lng);
+        diagnosticData.targetLocation = { ...targetLocation, elevation: targetElevation };
         instructions.innerHTML = `<p>Target selected. Look around to find it!</p>`;
 
         if (window.targetMarker) {
@@ -91,45 +92,39 @@ document.addEventListener('DOMContentLoaded', () => {
         let advancedSensorReadingReceived = false;
         let legacySensorReadingReceived = false;
 
-        const handleNewHeading = (data, isAbsolute) => {
+        const handleNewHeading = (event, isAbsolute) => {
             let trueHeading; // This will be our final, True North heading.
             let magneticHeadingForDiagnostics;
+            let pitch;
 
             if (isAbsolute) {
                 // The AbsoluteOrientationSensor provides orientation relative to True North.
-                // We do not need to apply magnetic declination.
                 if (!advancedSensorReadingReceived) {
                     logMessage('First advanced sensor reading received.');
                     advancedSensorReadingReceived = true;
                 }
 
                 // 1. Convert quaternion to Euler angles
-                const euler = quaternionToEuler(data);
-
-                // 2. The yaw is counter-clockwise from the East axis. Convert to degrees.
+                const euler = quaternionToEuler(event); // event is sensor.quaternion
                 const yawDegrees = euler.yaw * 180 / Math.PI;
+                pitch = euler.pitch * 180 / Math.PI;
 
-                // 3. Convert yaw to a compass heading (clockwise from North).
-                // Formula: heading = (450 - yawDegrees) % 360 or (90 - yawDegrees + 360) % 360
+                // 2. Convert yaw to a compass heading (clockwise from North).
                 let compassHeading = (360 - yawDegrees) % 360;
                 trueHeading = compassHeading;
-
-                // For diagnostics, we can calculate what the magnetic heading would be.
                 magneticHeadingForDiagnostics = trueHeading - magneticDeclination;
-
-                diagnosticData.rawHeading = yawDegrees.toFixed(2); // Log the raw yaw for debugging
+                diagnosticData.rawHeading = yawDegrees.toFixed(2);
 
             } else {
                 // The legacy deviceorientation event provides a magnetic heading.
-                // We MUST apply magnetic declination to get True North.
                 if (!legacySensorReadingReceived) {
                     logMessage('First legacy sensor reading received.');
                     legacySensorReadingReceived = true;
                 }
-                const magneticHeading = data; // This is event.alpha from the legacy sensor
+                const magneticHeading = event.webkitCompassHeading || event.alpha;
+                pitch = event.beta; // pitch from legacy sensor
                 trueHeading = magneticHeading + magneticDeclination;
                 magneticHeadingForDiagnostics = magneticHeading;
-
                 diagnosticData.rawHeading = magneticHeading.toFixed(2);
             }
 
@@ -163,7 +158,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Correct for screen orientation
             const screenOrientationAngle = screen.orientation.angle || 0;
             deviceOrientation = (smoothedHeading - screenOrientationAngle + 360) % 360;
+            devicePitch = pitch; // Store the pitch
             diagnosticData.screenCorrectedHeading = deviceOrientation.toFixed(2);
+            diagnosticData.pitch = devicePitch.toFixed(2);
 
 
             updateARView();
@@ -172,15 +169,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const setupLegacyListener = () => {
             logMessage('Setting up legacy sensor listener...');
             const handleOrientationEvent = (event) => {
-                if (typeof event.webkitCompassHeading !== 'undefined') {
-                    handleNewHeading(event.webkitCompassHeading, false);
-                    return;
-                }
-                if (event.absolute === true) {
-                    handleNewHeading(event.alpha, false);
+                if (typeof event.webkitCompassHeading !== 'undefined' || event.alpha !== null) {
+                    handleNewHeading(event, false);
                 } else {
-                    logMessage("Compass is relative, which is not supported.", true);
-                    compassStatus.textContent = 'Compass: Relative (unsupported)';
+                    logMessage("Compass data not available in event.", true);
+                    compassStatus.textContent = 'Compass: Error';
                     compassStatus.style.color = 'red';
                 }
             };
@@ -231,15 +224,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (navigator.geolocation) {
             logMessage('Geolocation API is available. Watching position...');
             navigator.geolocation.watchPosition(
-                (position) => {
-                    if (!userLocation) {
-                        logMessage('Received first geolocation update.');
-                    }
+                async (position) => {
+                    const firstUpdate = !userLocation;
                     userLocation = {
                         lat: position.coords.latitude,
                         lng: position.coords.longitude
                     };
-                    diagnosticData.userLocation = userLocation;
+
+                    if (firstUpdate) {
+                        logMessage('Received first geolocation update. Fetching elevation...');
+                        userElevation = await getElevation(userLocation.lat, userLocation.lng);
+                        diagnosticData.userLocation = { ...userLocation, elevation: userElevation };
+                    } else {
+                        diagnosticData.userLocation = { ...userLocation, elevation: userElevation };
+                    }
+
 
                     if (!map.isUserLocationSet) {
                         map.isUserLocationSet = true;
@@ -282,18 +281,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateARView() {
-        if (!userLocation || !targetLocation || deviceOrientation === undefined) {
+        if (!userLocation || !targetLocation || deviceOrientation === undefined || devicePitch === undefined) {
             return;
         }
 
-        const distance = calculateDistance(userLocation, targetLocation);
+        const distance = calculateDistance(userLocation, targetLocation) * 1000; // convert km to meters
         const bearing = calculateBearing(userLocation, targetLocation);
         let angleDifference = bearing - deviceOrientation;
 
         if (angleDifference > 180) angleDifference -= 360;
         if (angleDifference < -180) angleDifference += 360;
 
-        diagnosticData.distance = distance.toFixed(2);
+        diagnosticData.distance = (distance / 1000).toFixed(2) + ' km';
         diagnosticData.bearing = bearing.toFixed(2);
         diagnosticData.angleDifference = angleDifference.toFixed(2);
 
@@ -305,23 +304,63 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const maxMarkerSize = window.innerWidth / 4;
         const minMarkerSize = 30;
-        const maxDistanceForScaling = 100;
+        const maxDistanceForScaling = 10000; // 10km
         const distanceRatio = Math.min(distance / maxDistanceForScaling, 1.0);
-        const markerSize = minMarkerSize + distanceRatio * (maxMarkerSize - minMarkerSize);
+        const markerSize = maxMarkerSize - distanceRatio * (maxMarkerSize - minMarkerSize);
         diagnosticData.markerSize = markerSize.toFixed(2);
 
         arMarker.style.borderBottomWidth = `${markerSize}px`;
         arMarker.style.borderLeftWidth = `${markerSize / 2}px`;
         arMarker.style.borderRightWidth = `${markerSize / 2}px`;
 
-        const fov = 60;
+        const fovHorizontal = 60;
+        const fovVertical = 45; // A guess for typical phone camera vertical FOV
         const screenWidth = window.innerWidth;
-        if (Math.abs(angleDifference) < fov / 2) {
-            const xPosition = (angleDifference / (fov / 2)) * (screenWidth / 2) + (screenWidth / 2);
+        const screenHeight = window.innerHeight;
+
+        // Horizontal positioning
+        if (Math.abs(angleDifference) < fovHorizontal / 2) {
+            const xPosition = (angleDifference / (fovHorizontal / 2)) * (screenWidth / 2) + (screenWidth / 2);
             arMarker.style.left = `${xPosition}px`;
             arMarker.style.display = 'block';
         } else {
             arMarker.style.display = 'none';
+        }
+
+        // Vertical positioning
+        if (userElevation !== undefined && targetElevation !== undefined) {
+            const elevationDifference = targetElevation - userElevation;
+            const verticalAngle = Math.atan2(elevationDifference, distance) * (180 / Math.PI);
+            diagnosticData.elevationAngle = verticalAngle.toFixed(2);
+
+            // The pitch from sensors is often inverted. Let's assume positive pitch is looking up.
+            // We need to map the vertical angle difference to the screen.
+            const verticalAngleDifference = verticalAngle - devicePitch;
+
+            if (Math.abs(verticalAngleDifference) < fovVertical / 2) {
+                const yPosition = (-verticalAngleDifference / (fovVertical / 2)) * (screenHeight / 2) + (screenHeight / 2);
+                arMarker.style.top = `${yPosition}px`;
+            }
+        }
+    }
+
+    async function getElevation(lat, lng) {
+        try {
+            const response = await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lng}`);
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            if (data.elevation && data.elevation.length > 0) {
+                logMessage(`Elevation for ${lat.toFixed(2)}, ${lng.toFixed(2)}: ${data.elevation[0]}m`);
+                return data.elevation[0];
+            } else {
+                logMessage(`Elevation data not found for ${lat.toFixed(2)}, ${lng.toFixed(2)}.`, true);
+                return 0; // Fallback to 0 if no elevation data is available
+            }
+        } catch (error) {
+            logMessage(`Failed to fetch elevation: ${error.message}`, true);
+            return 0; // Fallback to 0 on error
         }
     }
 
