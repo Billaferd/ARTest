@@ -216,14 +216,13 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
                 }
 
                 // 1. Convert quaternion to Euler angles.
-                // Note on axis conventions:
-                // - The AbsoluteOrientationSensor provides orientation relative to a standard East-North-Up (ENU) coordinate system.
-                // - In an ENU system, the Z axis is the vertical axis ("Up").
-                // - Therefore, the compass heading (yaw) is the rotation around the Z-axis.
-                // - Our quaternionToEuler function calculates this as `euler.yaw`.
+                // Note on axis conventions: Based on user feedback, the compass heading (turning left/right)
+                // corresponds to the `roll` value from our `quaternionToEuler` function (X-axis rotation).
+                // This is unconventional but matches the observed behavior.
+                diagnosticData.rawQuaternion = event; // Log the raw quaternion
                 const euler = quaternionToEuler(event);
-                const compassHeadingDegrees = euler.yaw * (180 / Math.PI);
-                pitch = euler.pitch * (180 / Math.PI); // Device's forward/backward tilt (around Y-axis in ENU).
+                const compassHeadingDegrees = euler.roll * (180 / Math.PI);
+                pitch = euler.pitch * (180 / Math.PI); // Keep pitch as Y-axis rotation for the AR view.
 
                 // 2. Convert the counter-clockwise angle to a clockwise compass bearing.
                 let compassHeading = (360 - compassHeadingDegrees) % 360;
