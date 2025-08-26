@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 // 3. Convert yaw to a compass heading (clockwise from North).
                 // Formula: heading = (450 - yawDegrees) % 360 or (90 - yawDegrees + 360) % 360
-                let compassHeading = (90 - yawDegrees + 360) % 360;
+                let compassHeading = (360 - yawDegrees) % 360;
                 trueHeading = compassHeading;
 
                 // For diagnostics, we can calculate what the magnetic heading would be.
