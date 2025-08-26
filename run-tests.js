@@ -44,9 +44,21 @@ function runTests() {
     assert.strictEqual(identityE.pitch, 0, 'quaternionToEuler: Identity pitch');
     assert.strictEqual(identityE.roll, 0, 'quaternionToEuler: Identity roll');
 
-    const yawQ = [0, Math.sin(Math.PI / 4), 0, Math.cos(Math.PI / 4)];
+    // Test a 90-degree rotation around Y-axis (should affect pitch)
+    const pitchQ = [0, Math.sin(Math.PI / 4), 0, Math.cos(Math.PI / 4)];
+    const pitchE = quaternionToEuler(pitchQ);
+    assertAlmostEqual(pitchE.pitch, Math.PI / 2, 1e-6, 'quaternionToEuler: 90-degree Y-axis rotation (pitch)');
+
+    // Test a 90-degree rotation around Z-axis (should affect yaw)
+    const yawQ = [0, 0, Math.sin(Math.PI / 4), Math.cos(Math.PI / 4)];
     const yawE = quaternionToEuler(yawQ);
-    assertAlmostEqual(yawE.pitch, Math.PI / 2, 1e-6, 'quaternionToEuler: 90-degree rotation around Y-axis (pitch)');
+    assertAlmostEqual(yawE.yaw, Math.PI / 2, 1e-6, 'quaternionToEuler: 90-degree Z-axis rotation (yaw)');
+
+    // Test a small rotation around Z-axis to check for wrapping issues
+    const smallAngleRad = 2 * Math.PI / 180; // 2 degrees
+    const smallYawQ = [0, 0, Math.sin(smallAngleRad / 2), Math.cos(smallAngleRad / 2)];
+    const smallYawE = quaternionToEuler(smallYawQ);
+    assertAlmostEqual(smallYawE.yaw, smallAngleRad, 1e-6, 'quaternionToEuler: Small Z-axis rotation');
     console.log('✓ quaternionToEuler tests passed.');
 
     // --- getTargetPositionInScene ---
