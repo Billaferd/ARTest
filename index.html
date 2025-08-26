@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>AR Viewfinder</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
     <link rel="stylesheet" href="style.css">
@@ -13,18 +13,21 @@
         <video id="camera-feed" autoplay playsinline></video>
         <canvas id="renderCanvas"></canvas>
     </div>
-    <div id="instructions">
-        <p>Click on the map to select a target location.</p>
+    <div id="ui-container">
+        <div id="instructions"></div>
+        <div id="compass-status"></div>
+        <div id="arrow-container">
+            <div id="arrow"></div>
+        </div>
+        <div id="diagnostics" class="hidden"></div>
+        <button id="toggle-diagnostics-btn">Diagnostics</button>
     </div>
-    <div id="compass-status"></div>
-    <button id="toggle-diagnostics-btn">Toggle Diagnostics</button>
-    <div id="diagnostics"></div>
 
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="https://unpkg.com/geomag/dist/geomag.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/kalmanjs@1.1.0/lib/kalman.min.js"></script>
     <script src="https://cdn.babylonjs.com/babylon.js"></script>
     <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
-    <script src="script.js"></script>
+    <script type="module" src="js/main.js"></script>
 </body>
 </html>
