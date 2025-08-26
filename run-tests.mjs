@@ -1,10 +1,10 @@
-const assert = require('assert');
-const {
+import assert from 'assert';
+import {
     calculateDistance,
     calculateBearing,
     quaternionToEuler,
     getTargetPositionInScene
-} = require('./script.js');
+} from './js/utils.js';
 
 // Helper for comparing floating point numbers
 function assertAlmostEqual(actual, expected, tolerance = 1e-6, message = '') {
