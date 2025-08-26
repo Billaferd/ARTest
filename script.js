@@ -466,8 +466,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // X is the East/West component
         const x = distance * Math.sin(bearingRad);
 
-        // Z is the North/South component
-        const z = distance * Math.cos(bearingRad);
+        // Z is the North/South component.
+        // We negate Z because the Babylon.js camera looks down the -Z axis by default.
+        // This aligns our scene's coordinate system (North = -Z) with the camera's.
+        const z = -distance * Math.cos(bearingRad);
 
         return new BABYLON.Vector3(x, y, z);
     }
