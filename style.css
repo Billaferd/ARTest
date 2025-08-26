@@ -102,4 +102,17 @@ body {
     border-left: 20px solid transparent;
     border-right: 20px solid transparent;
     border-bottom: 40px solid rgba(255, 0, 0, 0.8);
+    position: relative;
+}
+
+#arrow::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 0;
+    border-left: 10px solid transparent;
+    border-right: 10px solid transparent;
+    border-bottom: 20px solid white;
+    top: 0;
+    left: -10px;
 }
