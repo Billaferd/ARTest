@@ -1,0 +1,19 @@
+{
+  "name": "app",
+  "version": "1.0.0",
+  "description": "Augmented Reality Testing",
+  "main": "script.js",
+  "scripts": {
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Billaferd/ARTest.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Billaferd/ARTest/issues"
+  },
+  "homepage": "https://github.com/Billaferd/ARTest#readme"
+}

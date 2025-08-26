@@ -50,7 +50,6 @@ body {
 }
 
 #diagnostics {
-    display: none; /* Hide the diagnostics panel */
     position: fixed;
     bottom: 10px;
     left: 10px;
