@@ -2,7 +2,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const mapElement = document.getElementById('map');
     const cameraContainer = document.getElementById('camera-container');
     const cameraFeed = document.getElementById('camera-feed');
-    const arMarker = document.getElementById('ar-marker');
     const instructions = document.getElementById('instructions');
     const diagnosticsOverlay = document.getElementById('diagnostics');
     const compassStatus = document.getElementById('compass-status');
@@ -13,6 +12,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let deviceOrientation, devicePitch;
     let magneticDeclination = 0;
     let isDeclinationAvailable = false;
+
+    // Babylon.js variables
+    let engine;
+    let scene;
+    let arCamera;
+    let lightPillar;
 
     let diagnosticData = {};
     let logMessages = [];
@@ -54,10 +59,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         mapElement.style.display = 'none';
         cameraContainer.style.display = 'block';
-        arMarker.style.display = 'block';
 
         startCamera();
         startSensors();
+        if (!engine) { // Check if babylon is already initialized
+            initBabylonScene();
+        }
     });
 
     function startCamera() {
@@ -281,67 +288,48 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateARView() {
-        if (!userLocation || !targetLocation || deviceOrientation === undefined || devicePitch === undefined) {
+        // This function is now the main AR render loop
+        if (!userLocation || !targetLocation || deviceOrientation === undefined || devicePitch === undefined || !scene) {
             return;
         }
 
-        const distance = calculateDistance(userLocation, targetLocation) * 1000; // convert km to meters
-        const bearing = calculateBearing(userLocation, targetLocation);
-        let angleDifference = bearing - deviceOrientation;
-
-        if (angleDifference > 180) angleDifference -= 360;
-        if (angleDifference < -180) angleDifference += 360;
-
-        diagnosticData.distance = (distance / 1000).toFixed(2) + ' km';
-        diagnosticData.bearing = bearing.toFixed(2);
-        diagnosticData.angleDifference = angleDifference.toFixed(2);
-
-        if (Math.abs(angleDifference) < 2.0) {
-            cameraContainer.classList.add('target-in-view');
-        } else {
-            cameraContainer.classList.remove('target-in-view');
-        }
-
-        const maxMarkerSize = window.innerWidth / 4;
-        const minMarkerSize = 30;
-        const maxDistanceForScaling = 10000; // 10km
-        const distanceRatio = Math.min(distance / maxDistanceForScaling, 1.0);
-        const markerSize = maxMarkerSize - distanceRatio * (maxMarkerSize - minMarkerSize);
-        diagnosticData.markerSize = markerSize.toFixed(2);
-
-        arMarker.style.borderBottomWidth = `${markerSize}px`;
-        arMarker.style.borderLeftWidth = `${markerSize / 2}px`;
-        arMarker.style.borderRightWidth = `${markerSize / 2}px`;
-
-        const fovHorizontal = 60;
-        const fovVertical = 45; // A guess for typical phone camera vertical FOV
-        const screenWidth = window.innerWidth;
-        const screenHeight = window.innerHeight;
-
-        // Horizontal positioning
-        if (Math.abs(angleDifference) < fovHorizontal / 2) {
-            const xPosition = (angleDifference / (fovHorizontal / 2)) * (screenWidth / 2) + (screenWidth / 2);
-            arMarker.style.left = `${xPosition}px`;
-            arMarker.style.display = 'block';
-        } else {
-            arMarker.style.display = 'none';
-        }
-
-        // Vertical positioning
-        if (userElevation !== undefined && targetElevation !== undefined) {
-            const elevationDifference = targetElevation - userElevation;
-            const verticalAngle = Math.atan2(elevationDifference, distance) * (180 / Math.PI);
-            diagnosticData.elevationAngle = verticalAngle.toFixed(2);
-
-            // The pitch from sensors is often inverted. Let's assume positive pitch is looking up.
-            // We need to map the vertical angle difference to the screen.
-            const verticalAngleDifference = verticalAngle - devicePitch;
-
-            if (Math.abs(verticalAngleDifference) < fovVertical / 2) {
-                const yPosition = (-verticalAngleDifference / (fovVertical / 2)) * (screenHeight / 2) + (screenHeight / 2);
-                arMarker.style.top = `${yPosition}px`;
+        // --- Update 3D Model Position ---
+        if (lightPillar && userElevation !== undefined && targetElevation !== undefined) {
+            // Ensure the pillar is visible
+            if (!lightPillar.isEnabled()) {
+                lightPillar.setEnabled(true);
+                logMessage('Light pillar is now visible.');
             }
+
+            // Get the target's position in the 3D scene relative to the user
+            const targetPosition = getTargetPositionInScene(userLocation, targetLocation, userElevation, targetElevation);
+            lightPillar.position = targetPosition;
+
+            diagnosticData.targetPosition3D = {
+                x: targetPosition.x.toFixed(2),
+                y: targetPosition.y.toFixed(2),
+                z: targetPosition.z.toFixed(2)
+            };
         }
+
+        // --- Update Camera Rotation ---
+        if (arCamera) {
+            // Convert device orientation (degrees) to radians for Babylon.js
+            // Yaw is heading, corresponds to rotation around Y axis. Negate for Babylon's convention.
+            const yawRad = -deviceOrientation * (Math.PI / 180);
+            // Pitch is up/down tilt, corresponds to rotation around X axis.
+            const pitchRad = devicePitch * (Math.PI / 180);
+
+            // Create a quaternion from the yaw and pitch. Roll is ignored.
+            const rotationQuaternion = BABYLON.Quaternion.RotationYawPitchRoll(yawRad, pitchRad, 0);
+            arCamera.rotationQuaternion = rotationQuaternion;
+        }
+
+        // --- (Optional) Update Diagnostics ---
+        const distance = calculateDistance(userLocation, targetLocation) * 1000;
+        diagnosticData.distance = (distance / 1000).toFixed(2) + ' km';
+        const bearing = calculateBearing(userLocation, targetLocation);
+        diagnosticData.bearing = bearing.toFixed(2);
     }
 
     async function getElevation(lat, lng) {
@@ -402,6 +390,75 @@ document.addEventListener('DOMContentLoaded', () => {
                   Math.sin(lat1) * Math.cos(lat2) * Math.cos(lng2 - lng1);
         const bearing = Math.atan2(y, x) * toDegrees;
         return (bearing + 360) % 360;
+    }
+
+    /**
+     * Converts a target's geographic coordinates to a 3D vector relative to the user.
+     * @param {object} userLoc - The user's location {lat, lng}.
+     * @param {object} targetLoc - The target's location {lat, lng}.
+     * @param {number} userElev - The user's elevation in meters.
+     * @param {number} targetElev - The target's elevation in meters.
+     * @returns {BABYLON.Vector3} The 3D position vector for the scene.
+     */
+    function getTargetPositionInScene(userLoc, targetLoc, userElev, targetElev) {
+        const distance = calculateDistance(userLoc, targetLoc) * 1000; // convert km to meters
+        const bearing = calculateBearing(userLoc, targetLoc);
+        const bearingRad = bearing * (Math.PI / 180);
+
+        // Y is the elevation difference (Up/Down in the scene)
+        const y = targetElev - userElev;
+
+        // X is the East/West component
+        const x = distance * Math.sin(bearingRad);
+
+        // Z is the North/South component
+        const z = distance * Math.cos(bearingRad);
+
+        return new BABYLON.Vector3(x, y, z);
+    }
+
+    function initBabylonScene() {
+        const canvas = document.getElementById('renderCanvas');
+        engine = new BABYLON.Engine(canvas, true, { preserveDrawingBuffer: true, stencil: true });
+        scene = new BABYLON.Scene(engine);
+
+        // Make the scene background transparent
+        scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
+
+        // Create a camera that we will control manually
+        arCamera = new BABYLON.FreeCamera("arCamera", new BABYLON.Vector3(0, 0, 0), scene);
+
+        // Create a basic light
+        const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
+        light.intensity = 0.8;
+
+        // Create the 'light pillar' model
+        lightPillar = BABYLON.MeshBuilder.CreateCylinder("pillar", {
+            height: 50, // The pillar is tall
+            diameter: 5
+        }, scene);
+
+        const pillarMaterial = new BABYLON.StandardMaterial("pillarMaterial", scene);
+        pillarMaterial.emissiveColor = new BABYLON.Color3(0, 1, 0.5); // A cyan-green glow
+        pillarMaterial.disableLighting = true; // Make it self-illuminated
+        lightPillar.material = pillarMaterial;
+
+        // Initially hide the pillar until we have a target
+        lightPillar.setEnabled(false);
+
+        // Start the render loop
+        engine.runRenderLoop(() => {
+            if (scene) {
+                scene.render();
+            }
+        });
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            engine.resize();
+        });
+
+        logMessage('Babylon.js scene initialized.');
     }
 
     function quaternionToEuler(q) {

@@ -11,7 +11,7 @@
     <div id="map"></div>
     <div id="camera-container">
         <video id="camera-feed" autoplay playsinline></video>
-        <div id="ar-marker"></div>
+        <canvas id="renderCanvas"></canvas>
     </div>
     <div id="instructions">
         <p>Click on the map to select a target location.</p>
@@ -22,6 +22,8 @@
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <script src="https://unpkg.com/geomag/dist/geomag.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/kalmanjs@1.1.0/lib/kalman.min.js"></script>
+    <script src="https://cdn.babylonjs.com/babylon.js"></script>
+    <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
