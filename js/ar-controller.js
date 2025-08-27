@@ -67,34 +67,34 @@ export function updateARView(appState) {
         return;
     }
 
-    // --- Place Target in World (Once) ---
-    // This runs only once when we have the necessary data.
-    if (worldAnchor && targetLocation && userElevation !== undefined && targetElevation !== undefined && !isTargetPlaced) {
-        // The user's elevation is used as the anchor's elevation.
-        // This is a reasonable approximation, assuming the user doesn't change elevation dramatically at the exact moment the anchor is set.
-        const pos = getTargetPositionInScene(worldAnchor, targetLocation, userElevation, targetElevation);
-        lightPillar.position = new BABYLON.Vector3(pos.x, pos.y, pos.z);
-        isTargetPlaced = true;
-        lightPillar.setEnabled(true);
-        logMessage('Target has been placed in the AR world.');
-        appState.diagnosticData.targetPosition3D = { x: pos.x.toFixed(2), y: pos.y.toFixed(2), z: pos.z.toFixed(2) };
-    }
+    // --- Update World based on User Position and Orientation ---
+    // In this AR model, the camera stays at (0,0,0) and the world moves around it.
 
-
-    // --- Update Camera Rotation ---
+    // 1. Update Camera Rotation
+    // This orients the camera to match the device's physical orientation.
     if (arCamera) {
         const yaw = Math.PI - BABYLON.Tools.ToRadians(deviceOrientation);
         const pitch = BABYLON.Tools.ToRadians(devicePitch);
         arCamera.rotation = new BABYLON.Vector3(pitch, yaw, 0);
     }
 
-    // --- Update Camera Position ---
-    // This runs on every frame, moving the camera through the world.
-    if (worldAnchor && userLocation && userElevation !== undefined && isTargetPlaced) {
-        // We calculate the user's current position relative to the fixed world anchor.
-        const cameraPos = getTargetPositionInScene(worldAnchor, userLocation, userElevation, userElevation);
-        arCamera.position = new BABYLON.Vector3(cameraPos.x, cameraPos.y, cameraPos.z);
-        appState.diagnosticData.cameraPosition = { x: cameraPos.x.toFixed(2), y: cameraPos.y.toFixed(2), z: cameraPos.z.toFixed(2) };
+    // 2. Update Light Pillar Position
+    // This moves the pillar in the scene to reflect its real-world position relative to the user.
+    if (userLocation && targetLocation && userElevation !== undefined && targetElevation !== undefined) {
+        // Calculate the target's position relative to the user's current location.
+        const pos = getTargetPositionInScene(userLocation, targetLocation, userElevation, targetElevation);
+
+        // Update the light pillar's position in the 3D scene.
+        lightPillar.position = new BABYLON.Vector3(pos.x, pos.y, pos.z);
+
+        // Ensure the pillar is visible now that we have a position for it.
+        if (!lightPillar.isEnabled()) {
+            lightPillar.setEnabled(true);
+            logMessage('Target has been placed in the AR world.');
+        }
+
+        appState.diagnosticData.targetPosition3D = { x: pos.x.toFixed(2), y: pos.y.toFixed(2), z: pos.z.toFixed(2) };
+        appState.diagnosticData.cameraPosition = { x: '0.00', y: '0.00', z: '0.00' }; // Camera is always at origin
     }
 
 
