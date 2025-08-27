@@ -9,7 +9,9 @@ let targetMarker;
  * @param {function} onTargetSelect - Callback function for when a target is selected.
  */
 export function initMap(onTargetSelect) {
-    map = L.map('map').setView([0, 0], 2);
+    map = L.map('map', {
+        rotate: true
+    }).setView([0, 0], 2);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -64,9 +66,7 @@ function transitionToARView() {
  * @param {number} heading - The device's current heading in degrees.
  */
 export function rotateMap(heading) {
-    if (map) {
-        const mapElement = document.getElementById('map');
-        // We use the negative of the heading because CSS rotation is clockwise.
-        mapElement.style.transform = `rotate(${-heading}deg)`;
+    if (map && map.setBearing) {
+        map.setBearing(heading);
     }
 }
