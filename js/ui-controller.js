@@ -1,6 +1,7 @@
 // State for the UI
 let logMessages = [];
 let instructionTimeout;
+let buildTimestampEl;
 
 // DOM Elements
 const instructions = document.getElementById('instructions');
@@ -27,7 +28,8 @@ export function logMessage(message, isError = false) {
  * @param {object} data - The diagnostic data object.
  */
 export function updateDiagnostics(data) {
-    let content = '--- Diagnostics ---<br>';
+    let content = buildTimestampEl.outerHTML; // Start with the timestamp
+    content += '--- Diagnostics ---<br>';
     for (const [key, value] of Object.entries(data)) {
         let displayValue = value;
         if (value === undefined) {
@@ -81,6 +83,17 @@ export function hideInstruction() {
  * Initializes the UI controllers, such as button clicks.
  */
 export function initUI() {
+    // Create and store the build timestamp element
+    const buildTimestamp = new Date().toLocaleString('en-US', {
+        year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        timeZoneName: 'short'
+    });
+    buildTimestampEl = document.createElement('div');
+    buildTimestampEl.innerHTML = `Build: ${buildTimestamp}<br><br>`;
+    buildTimestampEl.style.textAlign = 'center';
+    buildTimestampEl.style.fontWeight = 'bold';
+
     // Set up diagnostics toggle button
     toggleDiagnosticsBtn.addEventListener('click', () => {
         diagnosticsOverlay.classList.toggle('hidden');
