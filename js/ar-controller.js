@@ -85,10 +85,11 @@ export function updateARView(appState) {
         const pos = getTargetPositionInScene(userLocation, targetLocation, userElevation, targetElevation);
         const pillarVector = new BABYLON.Vector3(pos.x, pos.y, pos.z);
 
-        // Next, create a rotation matrix that rotates the world around the camera (Y-axis)
-        // based on the device's compass heading.
+        // Next, create a rotation matrix that rotates the world around the camera (Y-axis).
+        // To transform from world coordinates (North-aligned) to camera-local coordinates,
+        // we must rotate by the *negative* of the device's heading.
         const headingRad = BABYLON.Tools.ToRadians(deviceOrientation);
-        const rotationMatrix = BABYLON.Matrix.RotationY(headingRad);
+        const rotationMatrix = BABYLON.Matrix.RotationY(-headingRad);
 
         // Apply this rotation to the pillar's position vector.
         const rotatedPillarVector = BABYLON.Vector3.TransformCoordinates(pillarVector, rotationMatrix);
