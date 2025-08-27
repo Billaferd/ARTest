@@ -21,7 +21,10 @@ body, html {
     width: 100%;
     height: 100%;
     z-index: 10;
-    transition: all var(--transition-speed) ease-in-out;
+    transition: width var(--transition-speed) ease-in-out,
+                height var(--transition-speed) ease-in-out,
+                top var(--transition-speed) ease-in-out,
+                left var(--transition-speed) ease-in-out;
     transform-origin: top left;
 }
 
