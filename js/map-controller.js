@@ -59,6 +59,13 @@ function transitionToARView() {
     setTimeout(() => {
         showInstruction("Look around to find the target", false);
     }, 1000);
+
+    // After the CSS transition, invalidate the map size so it redraws correctly.
+    setTimeout(() => {
+        if (map) {
+            map.invalidateSize();
+        }
+    }, 550); // A little after the transition ends (0.5s)
 }
 
 /**
