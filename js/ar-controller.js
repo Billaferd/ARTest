@@ -73,7 +73,11 @@ export function updateARView(appState) {
     // 1. Update Camera Rotation
     // This orients the camera to match the device's physical orientation.
     if (arCamera) {
-        const yaw = Math.PI - BABYLON.Tools.ToRadians(deviceOrientation);
+        // The world coordinate system has North along the -Z axis.
+        // The deviceOrientation is a compass heading (0° North, 90° East).
+        // To align the camera (which looks down -Z by default) with the compass,
+        // we need to rotate it around the Y axis by the negative of the heading.
+        const yaw = -BABYLON.Tools.ToRadians(deviceOrientation);
         const pitch = BABYLON.Tools.ToRadians(devicePitch);
         arCamera.rotation = new BABYLON.Vector3(pitch, yaw, 0);
     }
