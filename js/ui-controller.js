@@ -84,8 +84,7 @@ export function hideInstruction() {
  */
 export function initUI() {
     // Create and store the build timestamp element
-    // This is hardcoded to reflect a static build/deployment time.
-    const buildTimestamp = 'Aug 27 2025, 11:43 UTC';
+    const buildTimestamp = 'Aug 27 2025, 12:56 UTC';
     buildTimestampEl = document.createElement('div');
     buildTimestampEl.innerHTML = `Build: ${buildTimestamp}<br><br>`;
     buildTimestampEl.style.textAlign = 'center';
