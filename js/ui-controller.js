@@ -1,12 +1,13 @@
 // State for the UI
 let logMessages = [];
 let instructionTimeout;
-let buildTimestampEl;
 
 // DOM Elements
 const instructions = document.getElementById('instructions');
 const diagnosticsOverlay = document.getElementById('diagnostics');
 const toggleDiagnosticsBtn = document.getElementById('toggle-diagnostics-btn');
+const buildTimestampDiv = document.getElementById('build-timestamp');
+const dynamicDiagnosticsDiv = document.getElementById('dynamic-diagnostics');
 
 /**
  * Logs a message to the diagnostics panel.
@@ -28,8 +29,7 @@ export function logMessage(message, isError = false) {
  * @param {object} data - The diagnostic data object.
  */
 export function updateDiagnostics(data) {
-    let content = buildTimestampEl.outerHTML; // Start with the timestamp
-    content += '--- Diagnostics ---<br>';
+    let content = '--- Diagnostics ---<br>';
     for (const [key, value] of Object.entries(data)) {
         let displayValue = value;
         if (value === undefined) {
@@ -41,7 +41,7 @@ export function updateDiagnostics(data) {
     }
     content += '<br>--- Logs ---<br>';
     content += logMessages.join('<br>');
-    diagnosticsOverlay.innerHTML = content;
+    dynamicDiagnosticsDiv.innerHTML = content;
 }
 
 /**
@@ -83,12 +83,11 @@ export function hideInstruction() {
  * Initializes the UI controllers, such as button clicks.
  */
 export function initUI() {
-    // Create and store the build timestamp element
-    const buildTimestamp = 'Aug 27 2025, 12:56 UTC';
-    buildTimestampEl = document.createElement('div');
-    buildTimestampEl.innerHTML = `Build: ${buildTimestamp}<br><br>`;
-    buildTimestampEl.style.textAlign = 'center';
-    buildTimestampEl.style.fontWeight = 'bold';
+    // Set the build timestamp
+    const buildTimestamp = 'Aug 27 2025, 13:15 UTC';
+    buildTimestampDiv.innerHTML = `Build: ${buildTimestamp}<br><br>`;
+    buildTimestampDiv.style.textAlign = 'center';
+    buildTimestampDiv.style.fontWeight = 'bold';
 
     // Set up diagnostics toggle button
     toggleDiagnosticsBtn.addEventListener('click', () => {

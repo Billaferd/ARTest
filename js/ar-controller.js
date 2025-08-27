@@ -83,12 +83,12 @@ export function updateARView(appState) {
 
     // --- Update Camera Rotation ---
     if (arCamera) {
-        // This formula is derived empirically from user-provided data points
-        // to resolve a complex, non-linear offset in the device heading.
-        // The relationship that aligns the marker is: Bearing = -Heading + 401.
-        // We set the camera's yaw to match this calculated bearing.
-        const yawDegrees = -deviceOrientation + 401;
-        const yaw = BABYLON.Tools.ToRadians(yawDegrees);
+        // The deviceOrientation is now a reliable compass heading.
+        // We need to convert this to the camera's yaw.
+        // A compass heading of 0 (North) should align with the world's North (-Z axis), which is a yaw of 0.
+        // A heading of 90 (East) should align with the world's East (+X axis), which is a yaw of 90 degrees.
+        // Babylon's yaw is clockwise, which matches compass headings.
+        const yaw = BABYLON.Tools.ToRadians(deviceOrientation);
         const pitch = BABYLON.Tools.ToRadians(devicePitch);
         arCamera.rotation = new BABYLON.Vector3(pitch, yaw, 0);
     }

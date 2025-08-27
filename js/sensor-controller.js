@@ -36,7 +36,8 @@ export function startSensors(appState, onUpdate) {
             const euler = quaternionToEuler(event);
             const compassHeadingDegrees = euler.yaw * (180 / Math.PI);
             pitch = euler.pitch * (180 / Math.PI);
-            let compassHeading = (360 - compassHeadingDegrees) % 360;
+            // The `360 - ...` was an incorrect inversion. Normalizing to 0-360 is sufficient.
+            let compassHeading = (compassHeadingDegrees + 360) % 360;
             trueHeading = compassHeading;
             magneticHeadingForDiagnostics = trueHeading - appState.magneticDeclination;
             appState.diagnosticData.rawHeading = compassHeadingDegrees.toFixed(2);
@@ -123,9 +124,12 @@ export function startSensors(appState, onUpdate) {
         }
     };
 
-    if ('AbsoluteOrientationSensor' in window) {
+    // The AbsoluteOrientationSensor is preferred, but we provide a fallback to the legacy
+    // DeviceOrientationEvent if the advanced sensor fails for any reason.
+    try {
         startAdvancedSensor();
-    } else {
+    } catch (error) {
+        logMessage(`Could not start advanced sensor: ${error.message}. Trying legacy sensors.`, true);
         setupLegacyListener();
     }
 
