@@ -27,17 +27,13 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.targetElevation = target.elevation;
         appState.diagnosticData.targetLocation = { ...appState.targetLocation, elevation: appState.targetElevation };
 
-        const scene = document.querySelector('a-scene');
-        if (scene.hasLoaded) {
-            arObject.setAttribute('gps-new-entity-place', `latitude: ${target.lat}; longitude: ${target.lng}`);
-            arObject.setAttribute('visible', 'true');
-        } else {
-            scene.addEventListener('loaded', () => {
-                arObject.setAttribute('gps-new-entity-place', `latitude: ${target.lat}; longitude: ${target.lng}`);
-                arObject.setAttribute('visible', 'true');
-            });
-        }
+        arObject.setAttribute('gps-new-entity-place', `latitude: ${target.lat}; longitude: ${target.lng}`);
 
+        // A short timeout seems to be the most reliable way to ensure A-Frame has processed
+        // the new entity attributes before we try to make it visible.
+        setTimeout(() => {
+            arObject.setAttribute('visible', 'true');
+        }, 100);
 
         startSensors(appState, onSensorUpdate);
     });
