@@ -18,7 +18,9 @@ export function initBabylonScene(canvas) {
     scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
 
     // Create a camera that we will control manually
-    arCamera = new BABYLON.FreeCamera("arCamera", new BABYLON.Vector3(0, 0, 0), scene);
+    arCamera = new BABYLON.DeviceOrientationCamera("arCamera", new BABYLON.Vector3(0, 0, 0), scene);
+    arCamera.attachControl(canvas, true);
+
 
     // Create a basic light
     const light = new BABYLON.HemisphericLight("light", new BABYLON.Vector3(0, 1, 0), scene);
@@ -75,14 +77,6 @@ export function updateARView(appState) {
         lightPillar.position = new BABYLON.Vector3(pos.x, pos.y, pos.z);
 
         appState.diagnosticData.targetPosition3D = { x: pos.x.toFixed(2), y: pos.y.toFixed(2), z: pos.z.toFixed(2) };
-    }
-
-    // --- Update Camera Rotation ---
-    if (arCamera) {
-        const yawRad = deviceOrientation * (Math.PI / 180);
-        const pitchRad = devicePitch * (Math.PI / 180);
-        const rotationQuaternion = BABYLON.Quaternion.RotationYawPitchRoll(yawRad, pitchRad, 0);
-        arCamera.rotationQuaternion = rotationQuaternion;
     }
 
     // --- Arrow Indicator Logic ---
