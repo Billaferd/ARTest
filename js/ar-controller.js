@@ -19,6 +19,7 @@ export function initBabylonScene(canvas) {
 
     // Create a camera that we will control manually
     arCamera = new BABYLON.DeviceOrientationCamera("arCamera", new BABYLON.Vector3(0, 0, 0), scene);
+    arCamera.rotation.y = Math.PI; // Add a 180-degree rotation to fix orientation
     arCamera.attachControl(canvas, true);
 
 
