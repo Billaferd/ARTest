@@ -1,13 +1,10 @@
 import { initMap, rotateMap } from './map-controller.js';
-import { startCamera } from './camera-controller.js';
-import { initBabylonScene, updateARView } from './ar-controller.js';
 import { startSensors } from './sensor-controller.js';
 import { initUI, updateDiagnostics } from './ui-controller.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    // DOM Element selectors
-    const cameraFeed = document.getElementById('camera-feed');
-    const renderCanvas = document.getElementById('renderCanvas');
+    const scene = document.querySelector('a-scene');
+    const arObject = document.getElementById('ar-object');
 
     // Main application state
     const appState = {
@@ -24,27 +21,25 @@ document.addEventListener('DOMContentLoaded', () => {
         worldAnchor: null, // The origin of our AR world in geographic coordinates
     };
 
-    // --- Initialization ---
-    initUI(appState);
-    initMap((target) => {
-        appState.targetLocation = { lat: target.lat, lng: target.lng };
-        appState.targetElevation = target.elevation;
-        appState.diagnosticData.targetLocation = { ...appState.targetLocation, elevation: appState.targetElevation };
+    scene.addEventListener('loaded', () => {
+        // --- Initialization ---
+        initUI(appState);
+        initMap((target) => {
+            appState.targetLocation = { lat: target.lat, lng: target.lng };
+            appState.targetElevation = target.elevation;
+            appState.diagnosticData.targetLocation = { ...appState.targetLocation, elevation: appState.targetElevation };
 
-        startCamera(cameraFeed);
-        startSensors(appState, onSensorUpdate);
+            arObject.setAttribute('gps-new-entity-place', `latitude: ${target.lat}; longitude: ${target.lng}`);
+            arObject.setAttribute('visible', 'true');
 
-        if (!window.babylonInitialized) {
-            initBabylonScene(renderCanvas);
-            window.babylonInitialized = true;
-        }
+            startSensors(appState, onSensorUpdate);
+        });
     });
 
     function onSensorUpdate() {
         if (appState.deviceOrientation !== undefined) {
             rotateMap(appState.deviceOrientation);
         }
-        updateARView(appState);
     }
 
     setInterval(() => updateDiagnostics(appState.diagnosticData), 250);
