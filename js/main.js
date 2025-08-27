@@ -27,9 +27,16 @@ document.addEventListener('DOMContentLoaded', () => {
         appState.targetElevation = target.elevation;
         appState.diagnosticData.targetLocation = { ...appState.targetLocation, elevation: appState.targetElevation };
 
+        arObject.setAttribute('gps-new-entity-place', `latitude: ${target.lat}; longitude: ${target.lng}`);
+
         // A short timeout seems to be the most reliable way to ensure A-Frame has processed
         // the new entity attributes before we try to make it visible.
         setTimeout(() => {
+            if (appState.userElevation !== undefined && appState.targetElevation !== undefined) {
+                const elevationDiff = appState.targetElevation - appState.userElevation;
+                arObject.object3D.position.y = elevationDiff;
+                appState.diagnosticData.elevationDiff = elevationDiff.toFixed(2);
+            }
             arObject.setAttribute('visible', 'true');
         }, 100);
 
