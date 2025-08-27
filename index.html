@@ -17,8 +17,9 @@
             arjs='sourceType: webcam; videoTexture: true; debugUIEnabled: false;'
             renderer='antialias: true; alpha: true'
         >
-            <a-camera gps-new-camera='gpsMinDistance: 5'></a-camera>
-            <a-cylinder id="ar-object" radius="2.5" height="50" material="shader: flat; color: #00FF99" visible="false"></a-cylinder>
+            <a-camera gps-new-camera='gpsMinDistance: 5'>
+                <a-cylinder id="ar-object" radius="2.5" height="50" material="shader: flat; color: #00FF99" visible="false" position="0 1.5 -10"></a-cylinder>
+            </a-camera>
         </a-scene>
     </div>
     <div id="ui-container">
