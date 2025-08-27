@@ -3,7 +3,6 @@ import { startSensors } from './sensor-controller.js';
 import { initUI, updateDiagnostics } from './ui-controller.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-    const scene = document.querySelector('a-scene');
     const arObject = document.getElementById('ar-object');
 
     // Main application state
@@ -21,19 +20,26 @@ document.addEventListener('DOMContentLoaded', () => {
         worldAnchor: null, // The origin of our AR world in geographic coordinates
     };
 
-    scene.addEventListener('loaded', () => {
-        // --- Initialization ---
-        initUI(appState);
-        initMap((target) => {
-            appState.targetLocation = { lat: target.lat, lng: target.lng };
-            appState.targetElevation = target.elevation;
-            appState.diagnosticData.targetLocation = { ...appState.targetLocation, elevation: appState.targetElevation };
+    // --- Initialization ---
+    initUI(appState);
+    initMap((target) => {
+        appState.targetLocation = { lat: target.lat, lng: target.lng };
+        appState.targetElevation = target.elevation;
+        appState.diagnosticData.targetLocation = { ...appState.targetLocation, elevation: appState.targetElevation };
 
+        const scene = document.querySelector('a-scene');
+        if (scene.hasLoaded) {
             arObject.setAttribute('gps-new-entity-place', `latitude: ${target.lat}; longitude: ${target.lng}`);
             arObject.setAttribute('visible', 'true');
+        } else {
+            scene.addEventListener('loaded', () => {
+                arObject.setAttribute('gps-new-entity-place', `latitude: ${target.lat}; longitude: ${target.lng}`);
+                arObject.setAttribute('visible', 'true');
+            });
+        }
 
-            startSensors(appState, onSensorUpdate);
-        });
+
+        startSensors(appState, onSensorUpdate);
     });
 
     function onSensorUpdate() {
