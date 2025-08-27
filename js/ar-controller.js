@@ -70,26 +70,31 @@ export function updateARView(appState) {
     // --- Update World based on User Position and Orientation ---
     // In this AR model, the camera stays at (0,0,0) and the world moves around it.
 
-    // 1. Update Camera Rotation
-    // This orients the camera to match the device's physical orientation.
+    // 1. Update Camera Pitch (Up/Down Rotation)
+    // The user should be able to look up and down. Yaw (left/right) is handled by rotating the world.
     if (arCamera) {
-        // The world coordinate system has North along the -Z axis.
-        // The deviceOrientation is a compass heading (0° North, 90° East).
-        // To align the camera (which looks down -Z by default) with the compass,
-        // we need to rotate it around the Y axis by the negative of the heading.
-        const yaw = -BABYLON.Tools.ToRadians(deviceOrientation);
         const pitch = BABYLON.Tools.ToRadians(devicePitch);
-        arCamera.rotation = new BABYLON.Vector3(pitch, yaw, 0);
+        arCamera.rotation = new BABYLON.Vector3(pitch, 0, 0); // Yaw is locked to 0
     }
 
-    // 2. Update Light Pillar Position
-    // This moves the pillar in the scene to reflect its real-world position relative to the user.
+    // 2. Update Light Pillar Position and World Rotation
+    // This moves the pillar in the scene to reflect its real-world position relative to the user,
+    // and rotates it around the camera to match the compass heading.
     if (userLocation && targetLocation && userElevation !== undefined && targetElevation !== undefined) {
-        // Calculate the target's position relative to the user's current location.
+        // First, calculate the target's position vector relative to the user in a static, North-oriented frame.
         const pos = getTargetPositionInScene(userLocation, targetLocation, userElevation, targetElevation);
+        const pillarVector = new BABYLON.Vector3(pos.x, pos.y, pos.z);
 
-        // Update the light pillar's position in the 3D scene.
-        lightPillar.position = new BABYLON.Vector3(pos.x, pos.y, pos.z);
+        // Next, create a rotation matrix that rotates the world around the camera (Y-axis)
+        // based on the device's compass heading.
+        const headingRad = BABYLON.Tools.ToRadians(deviceOrientation);
+        const rotationMatrix = BABYLON.Matrix.RotationY(headingRad);
+
+        // Apply this rotation to the pillar's position vector.
+        const rotatedPillarVector = BABYLON.Vector3.TransformCoordinates(pillarVector, rotationMatrix);
+
+        // Update the light pillar's position with the rotated vector.
+        lightPillar.position = rotatedPillarVector;
 
         // Ensure the pillar is visible now that we have a position for it.
         if (!lightPillar.isEnabled()) {
@@ -97,7 +102,8 @@ export function updateARView(appState) {
             logMessage('Target has been placed in the AR world.');
         }
 
-        appState.diagnosticData.targetPosition3D = { x: pos.x.toFixed(2), y: pos.y.toFixed(2), z: pos.z.toFixed(2) };
+        const diagPos = lightPillar.position;
+        appState.diagnosticData.targetPosition3D = { x: diagPos.x.toFixed(2), y: diagPos.y.toFixed(2), z: diagPos.z.toFixed(2) };
         appState.diagnosticData.cameraPosition = { x: '0.00', y: '0.00', z: '0.00' }; // Camera is always at origin
     }
 
