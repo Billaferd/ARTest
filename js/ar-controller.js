@@ -5,6 +5,7 @@ let engine;
 let scene;
 let arCamera;
 let lightPillar;
+let isTargetPlaced = false;
 
 /**
  * Initializes the Babylon.js scene.
@@ -60,36 +61,42 @@ export function initBabylonScene(canvas) {
  * @param {object} appState - The current state of the application.
  */
 export function updateARView(appState) {
-    const { userLocation, targetLocation, deviceOrientation, devicePitch, userElevation, targetElevation } = appState;
+    const { userLocation, targetLocation, deviceOrientation, devicePitch, userElevation, targetElevation, worldAnchor } = appState;
 
     if (!userLocation || !targetLocation || deviceOrientation === undefined || devicePitch === undefined || !scene) {
         return;
     }
 
+    // --- Place Target in World (Once) ---
+    // This runs only once when we have the necessary data.
+    if (worldAnchor && targetLocation && userElevation !== undefined && targetElevation !== undefined && !isTargetPlaced) {
+        // The user's elevation is used as the anchor's elevation.
+        // This is a reasonable approximation, assuming the user doesn't change elevation dramatically at the exact moment the anchor is set.
+        const pos = getTargetPositionInScene(worldAnchor, targetLocation, userElevation, targetElevation);
+        lightPillar.position = new BABYLON.Vector3(pos.x, pos.y, pos.z);
+        isTargetPlaced = true;
+        lightPillar.setEnabled(true);
+        logMessage('Target has been placed in the AR world.');
+        appState.diagnosticData.targetPosition3D = { x: pos.x.toFixed(2), y: pos.y.toFixed(2), z: pos.z.toFixed(2) };
+    }
+
+
     // --- Update Camera Rotation ---
     if (arCamera) {
-        // We need to convert the true heading (0° = North, 90° = East) into a Babylon.js rotation.
-        // A standard FreeCamera with rotation (0,0,0) looks towards +Z.
-        // Our scene is set up so that North is in the -Z direction.
-        // So, a heading of 0° (North) must correspond to a camera rotation of 180° (Math.PI) around the Y-axis.
-        // A heading of 90° (East) must correspond to a camera rotation of 90° around the Y-axis.
         const yaw = Math.PI - BABYLON.Tools.ToRadians(deviceOrientation);
         const pitch = BABYLON.Tools.ToRadians(devicePitch);
         arCamera.rotation = new BABYLON.Vector3(pitch, yaw, 0);
     }
 
-    // --- Update 3D Model Position ---
-    if (lightPillar && userElevation !== undefined && targetElevation !== undefined) {
-        if (!lightPillar.isEnabled()) {
-            lightPillar.setEnabled(true);
-            logMessage('Light pillar is now visible.');
-        }
-
-        const pos = getTargetPositionInScene(userLocation, targetLocation, userElevation, targetElevation);
-        lightPillar.position = new BABYLON.Vector3(pos.x, pos.y, pos.z);
-
-        appState.diagnosticData.targetPosition3D = { x: pos.x.toFixed(2), y: pos.y.toFixed(2), z: pos.z.toFixed(2) };
+    // --- Update Camera Position ---
+    // This runs on every frame, moving the camera through the world.
+    if (worldAnchor && userLocation && userElevation !== undefined && isTargetPlaced) {
+        // We calculate the user's current position relative to the fixed world anchor.
+        const cameraPos = getTargetPositionInScene(worldAnchor, userLocation, userElevation, userElevation);
+        arCamera.position = new BABYLON.Vector3(cameraPos.x, cameraPos.y, cameraPos.z);
+        appState.diagnosticData.cameraPosition = { x: cameraPos.x.toFixed(2), y: cameraPos.y.toFixed(2), z: cameraPos.z.toFixed(2) };
     }
+
 
     // --- Arrow Indicator Logic ---
     const arrowContainer = document.getElementById('arrow-container');
