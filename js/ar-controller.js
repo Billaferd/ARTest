@@ -18,8 +18,8 @@ export function initBabylonScene(canvas) {
     scene.clearColor = new BABYLON.Color4(0, 0, 0, 0);
 
     // Create a camera that we will control manually
-    arCamera = new BABYLON.DeviceOrientationCamera("arCamera", new BABYLON.Vector3(0, 0, 0), scene);
-    arCamera.attachControl(canvas, true);
+    arCamera = new BABYLON.FreeCamera("arCamera", new BABYLON.Vector3(0, 0, 0), scene);
+    arCamera.attachControl(canvas, false); // We will control it manually
 
 
     // Create a basic light
@@ -64,6 +64,18 @@ export function updateARView(appState) {
 
     if (!userLocation || !targetLocation || deviceOrientation === undefined || devicePitch === undefined || !scene) {
         return;
+    }
+
+    // --- Update Camera Rotation ---
+    if (arCamera) {
+        // We need to convert the true heading (0° = North, 90° = East) into a Babylon.js rotation.
+        // A standard FreeCamera with rotation (0,0,0) looks towards +Z.
+        // Our scene is set up so that North is in the -Z direction.
+        // So, a heading of 0° (North) must correspond to a camera rotation of 180° (Math.PI) around the Y-axis.
+        // A heading of 90° (East) must correspond to a camera rotation of 90° around the Y-axis.
+        const yaw = Math.PI - BABYLON.Tools.ToRadians(deviceOrientation);
+        const pitch = BABYLON.Tools.ToRadians(devicePitch);
+        arCamera.rotation = new BABYLON.Vector3(pitch, yaw, 0);
     }
 
     // --- Update 3D Model Position ---

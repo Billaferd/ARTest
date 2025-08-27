@@ -76,7 +76,9 @@ export function startSensors(appState, onUpdate) {
         appState.diagnosticData.trueHeading = smoothedHeading.toFixed(2);
 
         const screenOrientationAngle = screen.orientation.angle || 0;
-        appState.deviceOrientation = smoothedHeading;
+        const correctedHeading = (smoothedHeading - screenOrientationAngle + 360) % 360;
+
+        appState.deviceOrientation = correctedHeading;
         appState.devicePitch = pitch;
         appState.diagnosticData.screenCorrectedHeading = appState.deviceOrientation.toFixed(2);
         appState.diagnosticData.pitch = appState.devicePitch.toFixed(2);
