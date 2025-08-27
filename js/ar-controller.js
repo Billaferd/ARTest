@@ -79,7 +79,7 @@ export function updateARView(appState) {
 
     // --- Update Camera Rotation ---
     if (arCamera) {
-        const yawRad = -deviceOrientation * (Math.PI / 180);
+        const yawRad = deviceOrientation * (Math.PI / 180);
         const pitchRad = devicePitch * (Math.PI / 180);
         const rotationQuaternion = BABYLON.Quaternion.RotationYawPitchRoll(yawRad, pitchRad, 0);
         arCamera.rotationQuaternion = rotationQuaternion;

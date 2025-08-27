@@ -90,7 +90,7 @@ export function getTargetPositionInScene(userLoc, targetLoc, userElev, targetEle
     // Z is the North/South component.
     // We negate Z because the Babylon.js camera looks down the -Z axis by default.
     // This aligns our scene's coordinate system (North = -Z) with the camera's.
-    const z = distance * Math.cos(bearingRad);
+    const z = -distance * Math.cos(bearingRad);
 
     // Returning a plain object for testability, can be converted to BABYLON.Vector3 later
     return { x, y, z };
