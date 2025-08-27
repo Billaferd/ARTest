@@ -85,9 +85,11 @@ export function updateARView(appState) {
     if (arCamera) {
         // The deviceOrientation is now a reliable compass heading.
         // We need to convert this to the camera's yaw.
-        // A compass heading of 0 (North) should align with the world's North (-Z axis), which is a yaw of 0.
-        // A heading of 90 (East) should align with the world's East (+X axis), which is a yaw of 90 degrees.
-        // Babylon's yaw is clockwise, which matches compass headings.
+        // A compass heading of 0 (North) should align with the world's North (-Z axis).
+        // A heading of 90 (East) should align with the world's East (+X axis).
+        // In Babylon's left-handed system, a counter-clockwise rotation (positive yaw) of 90 degrees
+        // correctly rotates the camera from North (-Z) to East (+X).
+        // Conveniently, a standard clockwise compass heading maps directly to the required yaw value.
         const yaw = BABYLON.Tools.ToRadians(deviceOrientation);
         const pitch = BABYLON.Tools.ToRadians(devicePitch);
         arCamera.rotation = new BABYLON.Vector3(pitch, yaw, 0);

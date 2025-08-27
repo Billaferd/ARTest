@@ -69,6 +69,31 @@ export function quaternionToEuler(q) {
 }
 
 /**
+ * Rotates a 3D vector by a quaternion.
+ * @param {number[]} v - The vector [x, y, z] to rotate.
+ * @param {number[]} q - The quaternion [x, y, z, w] to rotate by.
+ * @returns {number[]} The rotated vector [x, y, z].
+ */
+export function rotateVectorByQuaternion(v, q) {
+    const [vx, vy, vz] = v;
+    const [qx, qy, qz, qw] = q;
+
+    // Quaternion multiplication: q * v
+    const ix = qw * vx + qy * vz - qz * vy;
+    const iy = qw * vy + qz * vx - qx * vz;
+    const iz = qw * vz + qx * vy - qy * vx;
+    const iw = -qx * vx - qy * vy - qz * vz;
+
+    // Quaternion multiplication: (q*v) * q^-1
+    // q^-1 is (-qx, -qy, -qz, qw) for a unit quaternion.
+    const rx = ix * qw + iw * -qx + iy * -qz - iz * -qy;
+    const ry = iy * qw + iw * -qy + iz * -qx - ix * -qz;
+    const rz = iz * qw + iw * -qz + ix * -qy - iy * -qx;
+
+    return [rx, ry, rz];
+}
+
+/**
  * Converts a target's geographic coordinates to a 3D vector relative to an origin point.
  * @param {object} originCoords - The origin's location {lat, lng}.
  * @param {object} targetCoords - The target's location {lat, lng}.

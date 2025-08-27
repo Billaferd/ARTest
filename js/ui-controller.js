@@ -81,8 +81,9 @@ export function hideInstruction() {
 
 /**
  * Initializes the UI controllers, such as button clicks.
+ * @param {object} appState - The main application state.
  */
-export function initUI() {
+export function initUI(appState) {
     // Set the build timestamp
     const buildTimestamp = 'Aug 27 2025, 13:15 UTC';
     buildTimestampDiv.innerHTML = `Build: ${buildTimestamp}<br><br>`;
@@ -93,6 +94,18 @@ export function initUI() {
     toggleDiagnosticsBtn.addEventListener('click', () => {
         diagnosticsOverlay.classList.toggle('hidden');
     });
+
+    // Set up calibration slider
+    const headingOffsetSlider = document.getElementById('heading-offset');
+    const headingOffsetValue = document.getElementById('heading-offset-value');
+
+    headingOffsetSlider.addEventListener('input', (e) => {
+        const offset = parseFloat(e.target.value);
+        appState.calibrationOffset = offset;
+        headingOffsetValue.textContent = offset.toFixed(1);
+        appState.diagnosticData.calibrationOffset = offset.toFixed(1);
+    });
+
 
     // Collapse diagnostics by default
     diagnosticsOverlay.classList.add('hidden');
