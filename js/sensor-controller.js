@@ -1,5 +1,5 @@
 import { logMessage } from './ui-controller.js';
-import { quaternionToEuler } from './utils.js';
+import { quaternionToEuler, rotateVectorByQuaternion } from './utils.js';
 
 /**
  * Initializes and starts listening to device sensors (orientation and geolocation).
@@ -33,14 +33,26 @@ export function startSensors(appState, onUpdate) {
                 logMessage('First advanced sensor reading received.');
                 advancedSensorReadingReceived = true;
             }
-            const euler = quaternionToEuler(event);
-            const compassHeadingDegrees = euler.yaw * (180 / Math.PI);
+            // --- New, more robust heading calculation ---
+            // We rotate a 'forward' vector by the device's orientation quaternion.
+            // The angle of the resulting vector in the world's horizontal plane is the heading.
+            const q = event; // event is the quaternion array
+            const deviceForward = [0, 0, -1]; // The direction the back of the phone points
+            const worldForward = rotateVectorByQuaternion(deviceForward, q);
+
+            // The world coordinate system is East-North-Up (ENU).
+            // The heading is the angle in the East-North plane (X-Y plane of the world).
+            const headingRad = Math.atan2(worldForward[0], worldForward[1]); // atan2(east, north)
+            const magneticHeading = (headingRad * 180 / Math.PI + 360) % 360;
+
+            // We still need pitch, which we can get from the old Euler conversion.
+            // It's less sensitive to issues than yaw was.
+            const euler = quaternionToEuler(q);
             pitch = euler.pitch * (180 / Math.PI);
-            // The `360 - ...` was an incorrect inversion. Normalizing to 0-360 is sufficient.
-            let compassHeading = (compassHeadingDegrees + 360) % 360;
-            trueHeading = compassHeading;
-            magneticHeadingForDiagnostics = trueHeading - appState.magneticDeclination;
-            appState.diagnosticData.rawHeading = compassHeadingDegrees.toFixed(2);
+
+            trueHeading = (magneticHeading + appState.magneticDeclination + 360) % 360;
+            magneticHeadingForDiagnostics = magneticHeading;
+            appState.diagnosticData.rawHeading = magneticHeading.toFixed(2);
         } else {
             if (!legacySensorReadingReceived) {
                 logMessage('First legacy sensor reading received.');
@@ -76,10 +88,19 @@ export function startSensors(appState, onUpdate) {
         appState.diagnosticData.magneticHeading = (magneticHeadingForDiagnostics).toFixed(2);
         appState.diagnosticData.trueHeading = smoothedHeading.toFixed(2);
 
-        const screenOrientationAngle = screen.orientation.angle || 0;
-        const correctedHeading = (smoothedHeading - screenOrientationAngle + 360) % 360;
+        let finalHeading = smoothedHeading;
+        // The screen orientation correction is only needed for the legacy `deviceorientation` event,
+        // as the `AbsoluteOrientationSensor` provides a world-based orientation directly.
+        // The correction should be additive.
+        if (!isAbsolute) {
+            const screenOrientationAngle = screen.orientation.angle || 0;
+            finalHeading = (smoothedHeading + screenOrientationAngle + 360) % 360;
+        }
 
-        appState.deviceOrientation = correctedHeading;
+        // Apply manual calibration offset
+        const calibratedHeading = (finalHeading + appState.calibrationOffset + 360) % 360;
+
+        appState.deviceOrientation = calibratedHeading;
         appState.devicePitch = pitch;
         appState.diagnosticData.screenCorrectedHeading = appState.deviceOrientation.toFixed(2);
         appState.diagnosticData.pitch = appState.devicePitch.toFixed(2);

@@ -22,6 +22,10 @@
         <div id="diagnostics" class="hidden">
             <div id="build-timestamp"></div>
             <div id="dynamic-diagnostics"></div>
+            <div id="calibration-controls">
+                <label for="heading-offset">Calibrate: <span id="heading-offset-value">0</span>°</label>
+                <input type="range" id="heading-offset" min="-10" max="10" value="0" step="0.5">
+            </div>
         </div>
         <button id="toggle-diagnostics-btn">Diagnostics</button>
     </div>

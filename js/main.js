@@ -19,12 +19,13 @@ document.addEventListener('DOMContentLoaded', () => {
         devicePitch: undefined,
         magneticDeclination: 0,
         isDeclinationAvailable: false,
+        calibrationOffset: 0, // Manual heading correction in degrees
         diagnosticData: {},
         worldAnchor: null, // The origin of our AR world in geographic coordinates
     };
 
     // --- Initialization ---
-    initUI();
+    initUI(appState);
     initMap((target) => {
         appState.targetLocation = { lat: target.lat, lng: target.lng };
         appState.targetElevation = target.elevation;
