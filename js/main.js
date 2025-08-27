@@ -19,7 +19,8 @@ document.addEventListener('DOMContentLoaded', () => {
         devicePitch: undefined,
         magneticDeclination: 0,
         isDeclinationAvailable: false,
-        diagnosticData: {}
+        diagnosticData: {},
+        worldAnchor: null, // The origin of our AR world in geographic coordinates
     };
 
     // --- Initialization ---

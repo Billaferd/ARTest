@@ -140,6 +140,13 @@ export function startSensors(appState, onUpdate) {
                 };
 
                 if (firstUpdate) {
+                    // This is the first time we have a location, so set the world anchor
+                    appState.worldAnchor = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude,
+                    };
+                    logMessage(`World anchor set at: ${appState.worldAnchor.lat.toFixed(6)}, ${appState.worldAnchor.lng.toFixed(6)}`);
+
                     logMessage('Received first geolocation update. Fetching elevation...');
                     appState.userElevation = await getElevation(appState.userLocation.lat, appState.userLocation.lng);
                     appState.diagnosticData.userLocation = { ...appState.userLocation, elevation: appState.userElevation };

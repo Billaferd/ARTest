@@ -69,20 +69,20 @@ export function quaternionToEuler(q) {
 }
 
 /**
- * Converts a target's geographic coordinates to a 3D vector relative to the user.
- * @param {object} userLoc - The user's location {lat, lng}.
- * @param {object} targetLoc - The target's location {lat, lng}.
- * @param {number} userElev - The user's elevation in meters.
- * @param {number} targetElev - The target's elevation in meters.
+ * Converts a target's geographic coordinates to a 3D vector relative to an origin point.
+ * @param {object} originCoords - The origin's location {lat, lng}.
+ * @param {object} targetCoords - The target's location {lat, lng}.
+ * @param {number} originElevation - The origin's elevation in meters.
+ * @param {number} targetElevation - The target's elevation in meters.
  * @returns {object} The 3D position vector for the scene, compatible with BABYLON.Vector3.
  */
-export function getTargetPositionInScene(userLoc, targetLoc, userElev, targetElev) {
-    const distance = calculateDistance(userLoc, targetLoc) * 1000; // convert km to meters
-    const bearing = calculateBearing(userLoc, targetLoc);
+export function getTargetPositionInScene(originCoords, targetCoords, originElevation, targetElevation) {
+    const distance = calculateDistance(originCoords, targetCoords) * 1000; // convert km to meters
+    const bearing = calculateBearing(originCoords, targetCoords);
     const bearingRad = bearing * (Math.PI / 180);
 
     // Y is the elevation difference (Up/Down in the scene)
-    const y = targetElev - userElev;
+    const y = targetElevation - originElevation;
 
     // X is the East/West component
     const x = distance * Math.sin(bearingRad);
