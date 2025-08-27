@@ -88,7 +88,10 @@ export function updateARView(appState) {
         // Next, create a rotation matrix that rotates the world around the camera (Y-axis).
         // To transform from world coordinates (North-aligned) to camera-local coordinates,
         // we must rotate by the *negative* of the device's heading.
-        const headingRad = BABYLON.Tools.ToRadians(deviceOrientation);
+        // A hardcoded correction factor is added to calibrate for sensor inaccuracies.
+        const bearingCorrection = 139; // Degrees
+        const correctedHeading = deviceOrientation + bearingCorrection;
+        const headingRad = BABYLON.Tools.ToRadians(correctedHeading);
         const rotationMatrix = BABYLON.Matrix.RotationY(-headingRad);
 
         // Apply this rotation to the pillar's position vector.
