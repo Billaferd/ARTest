@@ -1,4 +1,4 @@
-import { initMap, rotateMap } from './map-controller.js';
+import { initMap } from './map-controller.js';
 import { startSensors } from './sensor-controller.js';
 import { initUI, updateDiagnostics } from './ui-controller.js';
 
@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Initialization ---
     initUI(appState);
-    startSensors(appState, onSensorUpdate);
+    startSensors(appState, () => {}); // Start sensors, but no action is needed on update here
 
     initMap((target) => {
         appState.targetLocation = { lat: target.lat, lng: target.lng };
@@ -41,13 +41,6 @@ document.addEventListener('DOMContentLoaded', () => {
             arObject.setAttribute('visible', 'true');
         }, 100);
     });
-
-    function onSensorUpdate() {
-        // Rotate map if heading is available
-        if (appState.deviceOrientation !== undefined) {
-            rotateMap(appState.deviceOrientation);
-        }
-    }
 
     setInterval(() => updateDiagnostics(appState.diagnosticData), 250);
 });
