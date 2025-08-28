@@ -1,5 +1,3 @@
-import { rotateMap } from './map-controller.js';
-
 AFRAME.registerComponent('map-sync', {
     init: function () {
         this.camera = this.el.camera.el; // Get the camera entity
@@ -13,7 +11,7 @@ AFRAME.registerComponent('map-sync', {
     },
 
     tick: function () {
-        if (!this.camera) return;
+        if (!this.camera || typeof window.rotateMap !== 'function') return;
 
         const headingRad = this.camera.object3D.rotation.y;
         const headingDeg = (THREE.MathUtils.radToDeg(headingRad) * -1 + 360) % 360;
@@ -24,6 +22,6 @@ AFRAME.registerComponent('map-sync', {
                 Deg: ${headingDeg.toFixed(2)}`;
         }
 
-        rotateMap(headingDeg);
+        window.rotateMap(headingDeg);
     }
 });

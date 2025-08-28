@@ -77,3 +77,4 @@ export function rotateMap(heading) {
         map.setBearing(heading);
     }
 }
+window.rotateMap = rotateMap; // Expose for non-module scripts
