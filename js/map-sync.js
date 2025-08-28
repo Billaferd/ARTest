@@ -1,6 +1,7 @@
 AFRAME.registerComponent('map-sync', {
     init: function () {
         this.camera = this.el.sceneEl.camera.el; // Get the camera entity
+        this.tickCount = 0;
         try {
             this.kfX = new KalmanFilter();
             this.kfY = new KalmanFilter();
@@ -12,7 +13,8 @@ AFRAME.registerComponent('map-sync', {
     },
 
     tick: function () {
-        if (!this.camera || typeof window.rotateMap !== 'function' || !window.isARViewActive) {
+        this.tickCount++;
+        if (!this.camera || typeof window.rotateMap !== 'function' || this.tickCount < 90) {
             return;
         }
 
