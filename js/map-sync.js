@@ -12,7 +12,7 @@ AFRAME.registerComponent('map-sync', {
     },
 
     tick: function () {
-        if (!this.camera || typeof window.rotateMap !== 'function') {
+        if (!this.camera || typeof window.rotateMap !== 'function' || !window.isARViewActive) {
             return;
         }
 
