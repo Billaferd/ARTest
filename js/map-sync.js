@@ -24,7 +24,7 @@ AFRAME.registerComponent('map-sync', {
         // Adjust for screen orientation to make it relative to the back camera
         if (screen && screen.orientation && screen.orientation.angle) {
             const screenAngleRad = THREE.MathUtils.degToRad(screen.orientation.angle);
-            rawHeadingRad -= screenAngleRad;
+            rawHeadingRad += screenAngleRad;
         }
 
         let smoothedHeadingDeg;
