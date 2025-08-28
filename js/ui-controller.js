@@ -85,7 +85,8 @@ export function hideInstruction() {
  */
 export function initUI(appState) {
     // Set the build timestamp
-    const buildTimestamp = 'Aug 27 2025, 13:15 UTC';
+    // NOTE: This is a manually updated timestamp.
+    const buildTimestamp = 'Aug 27 2025, 17:09 UTC';
     buildTimestampDiv.innerHTML = `Build: ${buildTimestamp}<br><br>`;
     buildTimestampDiv.style.textAlign = 'center';
     buildTimestampDiv.style.fontWeight = 'bold';
