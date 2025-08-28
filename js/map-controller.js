@@ -1,6 +1,8 @@
 let map;
 let targetMarker;
 
+window.isARViewActive = false;
+
 /**
  * Initializes the Leaflet map.
  * @param {function} onTargetSelect - Callback for when a user selects a target.
@@ -42,6 +44,8 @@ export function initMap(onTargetSelect) {
 export function transitionToARView() {
     const mapElement = document.getElementById('map');
     const cameraContainer = document.getElementById('camera-container');
+
+    window.isARViewActive = true;
 
     mapElement.classList.add('collapsed');
     cameraContainer.style.display = 'block';
