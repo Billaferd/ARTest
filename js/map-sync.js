@@ -37,10 +37,10 @@ AFRAME.registerComponent('map-sync', {
             const filteredX = this.kfX.filter(x);
             const filteredY = this.kfY.filter(y);
             const smoothedHeadingRad = Math.atan2(filteredY, filteredX);
-            smoothedHeadingDeg = (THREE.MathUtils.radToDeg(smoothedHeadingRad) + 360) % 360;
+            smoothedHeadingDeg = (THREE.MathUtils.radToDeg(smoothedHeadingRad) + 180) % 360;
         } else {
             // Fallback to unsmoothed heading if filter is not available
-            smoothedHeadingDeg = (THREE.MathUtils.radToDeg(rawHeadingRad) + 360) % 360;
+            smoothedHeadingDeg = (THREE.MathUtils.radToDeg(rawHeadingRad) + 180) % 360;
         }
 
         // Rotate the map
