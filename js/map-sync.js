@@ -19,7 +19,13 @@ AFRAME.registerComponent('map-sync', {
         }
 
         // Get the camera's rotation around the Y axis (heading) in radians.
-        const rawHeadingRad = this.camera.object3D.rotation.y;
+        let rawHeadingRad = this.camera.object3D.rotation.y;
+
+        // Adjust for screen orientation to make it relative to the back camera
+        if (screen && screen.orientation && screen.orientation.angle) {
+            const screenAngleRad = THREE.MathUtils.degToRad(screen.orientation.angle);
+            rawHeadingRad -= screenAngleRad;
+        }
 
         let smoothedHeadingDeg;
 
