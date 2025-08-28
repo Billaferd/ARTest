@@ -70,9 +70,14 @@ function transitionToARView() {
 
 /**
  * Rotates the map to match the device's heading.
- * @param {number} heading - The device's current heading in degrees.
+ * @param {object} appState - The main application state.
  */
-export function rotateMap(heading) {
+export function rotateMap(appState) {
+    const heading = appState.deviceOrientation;
+    appState.diagnosticData.rotateMapCalled = new Date().toLocaleTimeString();
+    appState.diagnosticData.lastHeading = heading.toFixed(2);
+    appState.diagnosticData.setBearingExists = (typeof map.setBearing === 'function');
+
     if (map && map.setBearing) {
         map.setBearing(heading);
     }

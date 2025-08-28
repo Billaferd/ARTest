@@ -29,6 +29,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         arObject.setAttribute('gps-new-entity-place', `latitude: ${target.lat}; longitude: ${target.lng}`);
 
+        // Add raw elevation values to diagnostics for easy viewing
+        appState.diagnosticData.userElevation = appState.userElevation;
+        appState.diagnosticData.targetElevation = appState.targetElevation;
+
         // A short timeout seems to be the most reliable way to ensure A-Frame has processed
         // the new entity attributes before we try to make it visible.
         setTimeout(() => {
@@ -45,7 +49,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function onSensorUpdate() {
         if (appState.deviceOrientation !== undefined) {
-            rotateMap(appState.deviceOrientation);
+            rotateMap(appState);
         }
     }
 
