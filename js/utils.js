@@ -39,61 +39,6 @@ export function calculateBearing(start, end) {
 }
 
 /**
- * Converts a quaternion to Euler angles (yaw, pitch, roll).
- * @param {number[]} q - The quaternion as an array [x, y, z, w].
- * @returns {object} An object with { yaw, pitch, roll } in radians.
- */
-export function quaternionToEuler(q) {
-    const [x, y, z, w] = q;
-
-    // roll (x-axis rotation)
-    const sinr_cosp = 2 * (w * x + y * z);
-    const cosr_cosp = 1 - 2 * (x * x + y * y);
-    const roll = Math.atan2(sinr_cosp, cosr_cosp);
-
-    // pitch (y-axis rotation)
-    const sinp = 2 * (w * y - z * x);
-    let pitch;
-    if (Math.abs(sinp) >= 1) {
-        pitch = Math.sign(sinp) * Math.PI / 2; // use 90 degrees if out of range
-    } else {
-        pitch = Math.asin(sinp);
-    }
-
-    // yaw (z-axis rotation)
-    const siny_cosp = 2 * (w * z + x * y);
-    const cosy_cosp = 1 - 2 * (y * y + z * z);
-    const yaw = Math.atan2(siny_cosp, cosy_cosp);
-
-    return { yaw, pitch, roll };
-}
-
-/**
- * Rotates a 3D vector by a quaternion.
- * @param {number[]} v - The vector [x, y, z] to rotate.
- * @param {number[]} q - The quaternion [x, y, z, w] to rotate by.
- * @returns {number[]} The rotated vector [x, y, z].
- */
-export function rotateVectorByQuaternion(v, q) {
-    const [vx, vy, vz] = v;
-    const [qx, qy, qz, qw] = q;
-
-    // Quaternion multiplication: q * v
-    const ix = qw * vx + qy * vz - qz * vy;
-    const iy = qw * vy + qz * vx - qx * vz;
-    const iz = qw * vz + qx * vy - qy * vx;
-    const iw = -qx * vx - qy * vy - qz * vz;
-
-    // Quaternion multiplication: (q*v) * q^-1
-    // q^-1 is (-qx, -qy, -qz, qw) for a unit quaternion.
-    const rx = ix * qw + iw * -qx + iy * -qz - iz * -qy;
-    const ry = iy * qw + iw * -qy + iz * -qx - ix * -qz;
-    const rz = iz * qw + iw * -qz + ix * -qy - iy * -qx;
-
-    return [rx, ry, rz];
-}
-
-/**
  * Converts a target's geographic coordinates to a 3D vector relative to an origin point.
  * @param {object} originCoords - The origin's location {lat, lng}.
  * @param {object} targetCoords - The target's location {lat, lng}.
