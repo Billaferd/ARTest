@@ -22,6 +22,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- Initialization ---
     initUI(appState);
+    startSensors(appState, onSensorUpdate);
+
     initMap((target) => {
         appState.targetLocation = { lat: target.lat, lng: target.lng };
         appState.targetElevation = target.elevation;
@@ -29,27 +31,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
         arObject.setAttribute('gps-new-entity-place', `latitude: ${target.lat}; longitude: ${target.lng}`);
 
-        // Add raw elevation values to diagnostics for easy viewing
-        appState.diagnosticData.userElevation = appState.userElevation;
-        appState.diagnosticData.targetElevation = appState.targetElevation;
-
         // A short timeout seems to be the most reliable way to ensure A-Frame has processed
         // the new entity attributes before we try to make it visible.
         setTimeout(() => {
             if (appState.userElevation !== undefined && appState.targetElevation !== undefined) {
                 const elevationDiff = appState.targetElevation - appState.userElevation;
                 arObject.object3D.position.y = elevationDiff;
-                appState.diagnosticData.elevationDiff = elevationDiff.toFixed(2);
             }
             arObject.setAttribute('visible', 'true');
         }, 100);
-
-        startSensors(appState, onSensorUpdate);
     });
 
     function onSensorUpdate() {
+        // Rotate map if heading is available
         if (appState.deviceOrientation !== undefined) {
-            rotateMap(appState);
+            rotateMap(appState.deviceOrientation);
         }
     }
 
