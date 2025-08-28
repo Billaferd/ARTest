@@ -50,7 +50,8 @@ export function startSensors(appState, onUpdate) {
             const euler = quaternionToEuler(q);
             pitch = euler.pitch * (180 / Math.PI);
 
-            trueHeading = (magneticHeading + appState.magneticDeclination + 360) % 360;
+            // trueHeading = (magneticHeading + appState.magneticDeclination + 360) % 360; // Use True North
+            trueHeading = magneticHeading; // Use raw magnetic north as requested
             magneticHeadingForDiagnostics = magneticHeading;
             appState.diagnosticData.rawHeading = magneticHeading.toFixed(2);
         } else {
@@ -60,14 +61,15 @@ export function startSensors(appState, onUpdate) {
             }
             const magneticHeading = event.webkitCompassHeading || event.alpha;
             pitch = event.beta;
-            trueHeading = magneticHeading + appState.magneticDeclination;
+            // trueHeading = magneticHeading + appState.magneticDeclination; // Use True North
+            trueHeading = magneticHeading; // Use raw magnetic north as requested
             magneticHeadingForDiagnostics = magneticHeading;
             appState.diagnosticData.rawHeading = magneticHeading.toFixed(2);
         }
 
         appState.diagnosticData.isAbsolute = isAbsolute;
         const compassType = isAbsolute ? 'Advanced' : 'Legacy';
-        const headingType = appState.isDeclinationAvailable ? 'True' : 'Magnetic';
+        const headingType = 'Magnetic'; // Forcing magnetic heading as per user request
         const compassStatus = document.getElementById('compass-status');
         compassStatus.textContent = `Compass: ${compassType} (${headingType})`;
         compassStatus.style.color = isAbsolute ? 'cyan' : 'orange';
