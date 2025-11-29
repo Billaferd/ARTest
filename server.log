@@ -1,0 +1,5 @@
+127.0.0.1 - - [29/Nov/2025 21:06:20] "GET /index.html HTTP/1.1" 200 -
+127.0.0.1 - - [29/Nov/2025 21:06:21] "GET /style.css HTTP/1.1" 200 -
+127.0.0.1 - - [29/Nov/2025 21:06:21] "GET /js/main.js HTTP/1.1" 200 -
+127.0.0.1 - - [29/Nov/2025 21:06:21] "GET /js/map-sync.js HTTP/1.1" 200 -
+127.0.0.1 - - [29/Nov/2025 21:06:26] "GET /js/map-controller.js HTTP/1.1" 200 -
