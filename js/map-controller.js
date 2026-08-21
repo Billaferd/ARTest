@@ -1,29 +1,46 @@
 let map;
 let targetMarker;
+let userMarker;
 
 /**
  * Initializes the Leaflet map.
  * @param {function} onTargetSelect - Callback for when a user selects a target.
  */
 export function initMap(onTargetSelect) {
-    map = L.map('map', {
+    map = L.map("map", {
         rotate: true // Enable rotation features
     }).setView([0, 0], 2);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "&copy; <a href=\"https://www.openstreetmap.org/copyright\">OpenStreetMap</a> contributors"
     }).addTo(map);
 
-    // Get user's initial location to center the map
+    // Track user location continuously with high accuracy
     if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition((position) => {
-            const initialLocation = { lat: position.coords.latitude, lng: position.coords.longitude };
-            map.setView(initialLocation, 16);
-            L.marker(initialLocation).addTo(map).bindPopup("You are here").openPopup();
-        }, null, { enableHighAccuracy: true });
+        const geoOptions = {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 27000
+        };
+
+        navigator.geolocation.watchPosition(
+            (position) => {
+                const userLocation = { lat: position.coords.latitude, lng: position.coords.longitude };
+                if (userMarker) {
+                    userMarker.setLatLng(userLocation);
+                } else {
+                    map.setView(userLocation, 16);
+                    userMarker = L.marker(userLocation).addTo(map).bindPopup("You are here");
+                }
+            },
+            (err) => {
+                console.warn(`Geolocation error (${err.code}): ${err.message}`);
+            },
+            geoOptions
+        );
     }
 
-    map.on('click', (e) => {
+    map.on("click", (e) => {
         const targetLocation = e.latlng;
 
         if (targetMarker) {
@@ -40,11 +57,11 @@ export function initMap(onTargetSelect) {
  * Transitions the UI from map view to AR view.
  */
 export function transitionToARView() {
-    const mapElement = document.getElementById('map');
-    const cameraContainer = document.getElementById('camera-container');
+    const mapElement = document.getElementById("map");
+    const cameraContainer = document.getElementById("camera-container");
 
-    mapElement.classList.add('collapsed');
-    cameraContainer.style.display = 'block';
+    mapElement.classList.add("collapsed");
+    cameraContainer.style.display = "block";
 
     // After the CSS transition, invalidate the map size so it redraws correctly.
     setTimeout(() => {
